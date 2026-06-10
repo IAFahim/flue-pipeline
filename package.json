@@ -1,0 +1,24 @@
+{
+	"name": "flue-pipeline",
+	"version": "1.0.0",
+	"description": "",
+	"main": "index.js",
+	"scripts": {
+		"typecheck": "tsc --noEmit",
+		"dev": "flue dev --target node",
+		"build": "flue build --target node",
+		"pipeline": "flue run run-pipeline --target node --payload"
+	},
+	"keywords": [],
+	"author": "",
+	"license": "ISC",
+	"dependencies": {
+		"@flue/runtime": "^0.11.0",
+		"valibot": "^1.4.1"
+	},
+	"devDependencies": {
+		"@flue/cli": "^0.11.0",
+		"typescript": "^6.0.3"
+	},
+	"type": "module"
+}
