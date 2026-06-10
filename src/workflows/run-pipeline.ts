@@ -1,27 +1,17 @@
-import type { FlueContext, FlueSession, SkillReference } from '@flue/runtime';
+import type { FlueContext } from '@flue/runtime';
 import * as v from 'valibot';
 import pipelineRunner from '../agents/pipeline-runner';
-import { pipeline } from '../pipeline';
-
-const payloadSchema = v.object({ input: v.string() });
-const stepOutputSchema = v.object({ output: v.string() });
+import echo from '../skills/echo/SKILL.md' with { type: 'skill' };
 
 export async function run({ init, payload }: FlueContext) {
-	const { input } = v.parse(payloadSchema, payload);
+	const input = String((payload as any).input);
 	const harness = await init(pipelineRunner);
 	const session = await harness.session();
 
-	let current = input;
-	const trace: { step: string; output: string }[] = [];
+	const { data } = await session.skill(echo, {
+		args: { input },
+		result: v.object({ output: v.string() }),
+	});
 
-	for (const skill of pipeline) {
-		const { data } = await session.skill(skill, {
-			args: { input: current },
-			result: stepOutputSchema,
-		});
-		trace.push({ step: skill.name, output: data.output });
-		current = data.output;
-	}
-
-	return { input, steps: trace, result: current };
+	return { input, result: data.output };
 }
