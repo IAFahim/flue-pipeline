@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# sync-skills — pull the retrofitted Unity skills from the source of truth
+# (~/.claude/skills) into this repo's src/skills/, then sanity-check that every
+# mastery skill is wired into src/track-experts.ts and that the repo
+# still typechecks.
+#
+# Synced (full replace per dir): unity-cli, unity-agent-protocol,
+# unity-stage-foundations, unity-track-*.
+# NEVER touched (flue-local skills): track-task, track-undo, spawn, echo, outline.
+set -euo pipefail
+
+SRC="${SKILLS_SRC:-$HOME/.claude/skills}"
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DST="$REPO/src/skills"
+EXPERTS="$REPO/src/track-experts.ts"
+
+[ -d "$SRC" ] || { echo "FATAL: skill source $SRC not found" >&2; exit 1; }
+[ -d "$DST" ] || { echo "FATAL: $DST not found" >&2; exit 1; }
+
+echo "== sync-skills: $SRC -> $DST"
+
+synced=0
+names=()
+for dir in "$SRC"/unity-cli "$SRC"/unity-agent-protocol "$SRC"/unity-stage-foundations "$SRC"/unity-track-*; do
+	[ -d "$dir" ] || continue
+	name="$(basename "$dir")"
+	[ -f "$dir/SKILL.md" ] || { echo "SKIP $name (no SKILL.md)"; continue; }
+	rm -rf "${DST:?}/$name"
+	# -L: dereference symlinks — skill sources under ~/.claude/skills may be
+	# symlinks into the umbrella repo, and flue's packager refuses symlinks.
+	cp -rL "$dir" "$DST/$name"
+	synced=$((synced + 1))
+	names+=("$name")
+	echo "synced  $name"
+done
+echo "== synced $synced skill dir(s)"
+
+# Verify every synced MASTERY skill (stage-foundations + track-*) has a registry
+# entry in track-experts.ts. unity-cli / unity-agent-protocol are carried by
+# every expert, not registry keys, so they are exempt.
+missing=0
+for name in "${names[@]}"; do
+	case "$name" in
+	unity-cli | unity-agent-protocol) continue ;;
+	esac
+	if ! grep -q "'$name'" "$EXPERTS"; then
+		echo "MISSING expert entry for mastery skill: $name (add it to $EXPERTS)"
+		missing=$((missing + 1))
+	fi
+done
+if [ "$missing" -eq 0 ]; then
+	echo "== expert registry: OK (every synced mastery skill has an entry)"
+else
+	echo "== expert registry: $missing mastery skill(s) missing entries" >&2
+fi
+
+echo "== typecheck"
+if (cd "$REPO" && npm run --silent typecheck); then
+	echo "== typecheck: PASS"
+else
+	echo "== typecheck: FAIL" >&2
+	exit 1
+fi
+
+[ "$missing" -eq 0 ] || exit 1

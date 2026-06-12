@@ -978,5 +978,21 @@ Verified vex-ee 2026-06 (Packages/BovineLabs.Timeline.Distance/):
   activation, not per clip. With isKinematic=1 gravity is moot anyway
   (infinite mass skips gravity; body is velocity-driven).
 
+### 5w. Exec C# Authoring Traps (observed AI mistakes, 2026-06)
+- Generic type arguments are COMPILE-TIME names only. Never put an expression
+  inside angle brackets — `GetComponent<System.Type.GetType("X")>()` is a
+  compile error ("Invalid expression term ')'"). Resolve the type into a
+  variable and use the non-generic overload:
+  `var t = System.Type.GetType("X, Asm"); var c = t != null ? go.GetComponent(t) : null;`
+  Same rule for `AddComponent` and every other generic API: reflection-resolved
+  types go through the `System.Type`-taking overloads.
+- When a needed component type may be absent from the project, branch on the
+  null `System.Type` FIRST and report the missing prerequisite — never let a
+  null type reach an API call.
+- Guard scene/asset edits with a play-mode check first —
+  `if (UnityEditor.EditorApplication.isPlaying) return "BLOCKED|editor in play mode";`
+  — `EditorSceneManager.OpenScene` throws `InvalidOperationException` during
+  play mode. Never exit play mode yourself: the designer may be testing.
+
 ### 6. Third-Party / Package Upgrades and Namespaces
 When updating DOTS projects, be aware that structs and enums frequently shift between Unity's built-in packages and custom extension packages (e.g., `Unity.Physics.Stateful` migrating to `BovineLabs.Core.PhysicsStates`). If a type is "missing", don't assume the package is broken—use global searches (`grep_search`) across `Library/PackageCache` to find where the type was moved, then update the `using` statements and `.asmdef` references.
