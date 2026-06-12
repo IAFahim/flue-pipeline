@@ -85,4 +85,41 @@ const trackExperts: Record<string, ReturnType<typeof trackExpert>> = {
 	'unity-track-world-timescale': trackExpert('WorldTimeScaleTrack', worldTimeScale),
 };
 
+// --- The Ultimate Boss -------------------------------------------------------
+// The anti-specialist: ONE agent carrying EVERY mastery skill at once (all the
+// DOTS Timeline track families + the stage foundations) on top of the shared
+// operating/behavioral/result skills. A deliberate showcase of "what if one
+// agent held everything" versus the disciplined one-skill specialists. It runs
+// through the same track-task flow, so it still returns an evidenced memory
+// card with a deterministic undo journal. Reached via track key "__boss__".
+const allMastery: Skill[] = [
+	stageFoundations, distanceToStat, entityLinkCopyTransform, entityLinkMutate,
+	entityLinkParent, entityLinkTargetPatch, essenceEvent, essenceIntrinsic,
+	essenceStat, physicsAngularPid, physicsDrag, physicsFilterOverride,
+	physicsForce, physicsGravityOverride, physicsKinematicOverride,
+	physicsLinearPid, subDirector, timelineTimeScale, transformPosition,
+	transformRotation, transformScale, worldTimeScale,
+];
+
+const bossExpert = createAgent(() => ({
+	model: 'minimax/MiniMax-M2.7',
+	skills: [unityCli, agentProtocol, trackTask, trackUndo, ...allMastery],
+	instructions:
+		'You are the ULTIMATE BOSS — the anti-specialist. You carry EVERY ' +
+		'mastery skill at once: all the DOTS Timeline track families plus the ' +
+		'stage foundations. For the given request, decide which mastery skill(s) ' +
+		'apply, activate them, and apply the track-task skill using their ' +
+		'verified recipes — you MAY combine several skills in one job. You behave ' +
+		'per unity-agent-protocol: discovery over assumption (the named objects, ' +
+		'asset paths, and ids in each mastery skill are worked examples to ' +
+		'rediscover in THIS project), capture PRE| pre-state before every ' +
+		'mutation, never claim what you cannot evidence. You have NO unity-cli ' +
+		'and NO Unity project in your own sandbox: never shell out to unity-cli ' +
+		'and never give up because it is missing — you AUTHOR C# that the runtime ' +
+		'executes in the live Editor. Return exactly the structured result the ' +
+		'track-task skill defines.',
+}));
+
+trackExperts['__boss__'] = bossExpert;
+
 export default trackExperts;
