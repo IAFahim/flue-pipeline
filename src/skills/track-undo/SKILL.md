@@ -46,3 +46,12 @@ Do not invent: every path, name, and value in `undo` must be traceable to
 `execOutput` (or to the code itself for names the code chose). If the output
 lacks the evidence needed to invert a mutation, say so in `gaps` instead of
 guessing.
+
+**NEVER restore to an ASSUMED value.** If a mutation's pre-state is missing
+from `execOutput` (e.g. the code overwrote a director's `playableAsset` but no
+`PRE|` line carries the old value), do NOT emit a journal entry that writes a
+guessed value (null, a default, a remembered name) — a wrong "restore"
+destroys state that was never yours. Instead: include only the SAFE inverse
+ops (deleting artifacts the run itself created is always safe), and state in
+`gaps` exactly which value could not be restored and why, so the designer can
+restore it manually. An honest partial undo beats a destructive complete one.

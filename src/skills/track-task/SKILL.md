@@ -62,15 +62,20 @@ The C# block must:
   redeclare or shadow a name — C# forbids reusing a local's name even across
   nested scopes in the same method body. When a loop pattern repeats, suffix
   the locals (`i2`, `track2`, `go2`, …).
-- **Print a `PRE|` capture line before each mutation** (unity-agent-protocol
-  §2): immediately before changing anything, `UnityEngine.Debug.Log` a line of
-  the form `PRE|<what>|<exact current value(s) you are about to overwrite>` —
-  the captured field values, the binding that will be replaced, whether a
-  component already existed (add-vs-mutate), the asset list of a folder you
-  will write into. These printed captures are the evidence the undo journal is
-  built from; a mutation without a PRE| line cannot be undone honestly. Pure
-  read-only requests have no mutations and therefore no PRE| lines.
-- End by `return`-ing a short summary string describing what was done.
+- **Record a `PRE|` capture line before each mutation, IN THE RETURN VALUE**
+  (unity-agent-protocol §2): declare ONE
+  `var pre = new System.Text.StringBuilder();` at the top; immediately before
+  changing anything, `pre.AppendLine("PRE|<what>|<exact current value(s) you
+  are about to overwrite>")` — the captured field values (e.g. the director's
+  CURRENT playableAsset path, or NULL), the binding that will be replaced,
+  whether a folder/asset already existed (add-vs-mutate). **`Debug.Log` output
+  is NOT returned by `unity-cli exec`** — captures logged instead of returned
+  are LOST and the undo journal cannot be built. Every `return` statement
+  (success AND early bail-outs after the first mutation) must return
+  `pre.ToString() + "RESULT|<summary>"`. A mutation without a returned PRE|
+  line cannot be undone honestly. Pure read-only requests have no mutations
+  and therefore no PRE| lines.
+- End by `return`-ing `pre.ToString() + "RESULT|<short summary>"`.
 
 **Known-good discovery snippets — use these VERBATIM, do not improvise:**
 
@@ -114,7 +119,19 @@ the parent.)
 Directors live INSIDE the SubScene: open it additively
 (`EditorSceneManager.OpenScene(subScenePath, OpenSceneMode.Additive)`), then
 `UnityEngine.Object.FindObjectsByType<UnityEngine.Playables.PlayableDirector>(
-UnityEngine.FindObjectsInactive.Include, UnityEngine.FindObjectsSortMode.None)`.
+UnityEngine.FindObjectsInactive.Include, UnityEngine.FindObjectsSortMode.None)`
+and filter to `d.gameObject.scene == subScene`.
+
+Director SELECTION: the timeline-reference activation marker's verified
+FullName is `BovineLabs.Timeline.Core.Authoring.TimelineReferenceAuthoring`
+(assembly `BovineLabs.Timeline.Core.Authoring`) — resolve it with
+`System.Type.GetType("BovineLabs.Timeline.Core.Authoring.TimelineReferenceAuthoring, BovineLabs.Timeline.Core.Authoring")`
+and prefer the director whose GameObject carries it. **NEVER silently fall
+back to "the first director found"** — FindObjectsByType order is not
+meaningful, and the wrong director means you overwrite someone else's wiring.
+If the marker type resolves but no director carries it, or several do, return
+`pre.ToString() + "AMBIGUOUS|<each candidate: name + current playableAsset>"`
+and let the designer choose.
 
 **MANDATORY try/finally bracket:** the moment you open the SubScene, EVERYTHING
 after it goes inside `try { ... } finally { /* SetActiveScene(parent); CloseScene(sub,false); OpenScene(parentScenePath, OpenSceneMode.Single); */ }`
