@@ -65,15 +65,22 @@ export async function run({ init, payload }: FlueContext) {
 	let ok = false;
 	let repairRounds = 0;
 	for (let attempt = 1; attempt <= MAX_EXEC_ATTEMPTS; attempt++) {
-		try {
-			result = execFileSync('unity-cli', ['exec', data.code], {
-				encoding: 'utf8',
-				timeout: 120000,
-			}).trim();
-			ok = true;
-		} catch (e: any) {
-			ok = false;
-			result = 'EXEC FAILED: ' + (e?.stderr?.toString?.() || e?.message || String(e));
+		// Listener timeouts are TRANSIENT (domain reloads / editor settling) and
+		// nothing executed — retry the SAME code up to 3× with ~20s gaps before
+		// treating it as a failure.
+		for (let listenerTry = 1; listenerTry <= 3; listenerTry++) {
+			try {
+				result = execFileSync('unity-cli', ['exec', data.code], {
+					encoding: 'utf8',
+					timeout: 120000,
+				}).trim();
+				ok = true;
+			} catch (e: any) {
+				ok = false;
+				result = 'EXEC FAILED: ' + (e?.stderr?.toString?.() || e?.message || String(e));
+			}
+			if (ok || !/unity listener|health endpoint/i.test(result) || listenerTry === 3) break;
+			await new Promise((r) => setTimeout(r, 20000));
 		}
 		if (ok || !/compile error/i.test(result) || attempt === MAX_EXEC_ATTEMPTS) break;
 
