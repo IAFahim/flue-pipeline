@@ -12,7 +12,22 @@ import trackUndo from '../skills/track-undo/SKILL.md' with { type: 'skill' };
 // mastery expert for one DOTS Timeline track family and return a MEMORY CARD
 // envelope (the contract the Python codex codes against):
 //
-//   { ok, track, request, explanation, code, result, undo, gaps }
+//   { ok, track, request, explanation, code, result, undo, gaps,
+//     repairRounds, session }
+//
+// Conversation continuity: the caller may pass `payload.session` (a stable
+// name the Python side generates once per designer conversation) and, on
+// follow-ups, `payload.context` carrying the PRIOR memory card JSON. The
+// session name selects the named conversation scope WITHIN this process and
+// is echoed back in the envelope so the caller can thread follow-ups.
+// VERIFIED LIMIT (tested 2026-06-12, two `flue run` invocations, same name):
+// named sessions do NOT restore conversation across separate `flue run`
+// processes — each invocation's harness instanceId is a fresh workflow runId
+// (dist/server.mjs: `instanceId: runId`), and the session storage key embeds
+// that instanceId, so the same name maps to a different stored session every
+// run (and without src/db.ts the store is in-memory anyway). Cross-request
+// continuity therefore ships as card-as-context: the track-task skill treats
+// a prior-card `context` as the agent's own previous work.
 //
 // Two-pass design (the runtime supports sequential session.skill() calls on
 // one session — sessions are named conversation scopes; only CONCURRENT
@@ -29,10 +44,17 @@ import trackUndo from '../skills/track-undo/SKILL.md' with { type: 'skill' };
 //   pass 2 (track-undo skill)   -> { undo, gaps } derived from the ACTUAL
 //                                  printed PRE| values (evidence-derived undo
 //                                  per unity-agent-protocol §5).
-export async function run({ init, payload }: FlueContext) {
+export async function run({ init, payload, id }: FlueContext) {
 	const track = String((payload as any).track ?? '');
 	const request = String((payload as any).request ?? '');
 	const context = String((payload as any).context ?? '');
+	// Conversation name: caller-provided when continuing, otherwise derived
+	// from the runtime's own run id (deterministic, no Date.now/Math.random).
+	// Names starting with "task:" are reserved by the runtime — prefix guards.
+	const rawSession = String((payload as any).session ?? '').trim();
+	const sessionName = rawSession && !rawSession.startsWith('task:')
+		? rawSession
+		: `conv-${id.replace(/[^A-Za-z0-9_-]+/g, '-')}`;
 
 	const expert = trackExperts[track];
 	if (!expert) {
@@ -40,7 +62,7 @@ export async function run({ init, payload }: FlueContext) {
 	}
 
 	const harness = await init(expert);
-	const session = await harness.session();
+	const session = await harness.session(sessionName);
 
 	const resultSchema = v.object({ code: v.string(), explanation: v.string() });
 
@@ -134,5 +156,6 @@ export async function run({ init, payload }: FlueContext) {
 		repairRounds,
 		undo,
 		gaps,
+		session: sessionName,
 	};
 }
