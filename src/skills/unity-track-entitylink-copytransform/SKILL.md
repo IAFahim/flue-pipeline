@@ -137,7 +137,7 @@ checks this line in `OnUpdate` FIRST**, before suspecting their own wiring.
   tracks, same mover) each `ECB.SetComponent` the whole `LocalTransform`; playback order is
   `sortKey = [EntityIndexInQuery]` (chunk order) — last-writer-wins by entity-in-query order,
   NOT clip start time, and moot until the ECB bug is fixed.
-- **DON'T create schema assets — "no egg" (protocol §6)** — discover existing ones by type
+- **DON'T create schema assets — a missing prerequisite (protocol §6)** — discover existing ones by type
   (§3.4); report a missing/id-0 schema as a missing prerequisite.
 
 ## 3. DISCOVERY RECIPES
@@ -146,12 +146,12 @@ Act only through `unity-cli exec` / `unity-cli console`; never the filesystem; n
 unity-cli Safe Loop on every mutation. Names below are parameters — discover them in THIS
 project; never assume the worked example (§5).
 
-**3.1 Confirm the package exists (else "no egg" per protocol §6):**
+**3.1 Confirm the package exists (else report a missing prerequisite — protocol §6):**
 ```csharp
 var t = System.Type.GetType("BovineLabs.Timeline.EntityLinks.Authoring.EntityLinkCopyTransformTrack, BovineLabs.Timeline.EntityLinks.Authoring");
 var b = System.Type.GetType("BovineLabs.Reaction.Authoring.Core.TargetsAuthoring, BovineLabs.Reaction.Authoring");
 return t == null || b == null
-    ? "NO_EGG|EntityLinks track or TargetsAuthoring binding type absent in this project"
+    ? "MISSING_PREREQUISITE|EntityLinks track or TargetsAuthoring binding type absent in this project"
     : "OK|" + t.AssemblyQualifiedName + "|dataPath=" + UnityEngine.Application.dataPath;
 ```
 
@@ -174,7 +174,7 @@ director in the active SubScene"); zero directors → protocol §6.
   `AssetDatabase.FindAssets("t:EntityLinkSchema")` → per asset print
   `SCHEMA|<path>|guid=<g>|id=<n>`, reading the id by reflecting the `Id` property (or `id`
   field) and converting via `System.Convert.ToInt64` (byte/ushort-backed). id==0 ⇒ unusable
-  (silent never-resolve). **NEVER create schema assets** — out of domain ("no egg"); a usable
+  (silent never-resolve). **NEVER create schema assets** — out of domain (a missing prerequisite); a usable
   schema must already exist with a non-zero imported id AND its key present in the intended
   root's source set.
 - Derive `readRootFrom` from the discovered layout: `Self` if the bound object itself carries

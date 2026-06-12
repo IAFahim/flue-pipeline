@@ -135,10 +135,10 @@ Act only through `unity-cli exec` / `unity-cli console`; never the filesystem; n
 the unity-cli Safe Loop on every mutation. Names below are parameters — discover them in THIS project;
 never assume the worked example (§5).
 
-**3.1 Confirm the package exists (else "no egg" per protocol §6):**
+**3.1 Confirm the package exists (else report a missing prerequisite — protocol §6):**
 ```csharp
 var t = System.Type.GetType("BovineLabs.Timeline.Authoring.SubDirectorTrack, BovineLabs.Timeline.Authoring");
-return t == null ? "NO_EGG|SubDirectorTrack not found - BovineLabs core timeline package absent here"
+return t == null ? "MISSING_PREREQUISITE|SubDirectorTrack not found - BovineLabs core timeline package absent here"
                  : "OK|" + t.AssemblyQualifiedName + "|dataPath=" + UnityEngine.Application.dataPath;
 ```
 
@@ -152,7 +152,7 @@ root); SUB-DIRECTOR candidates are directors WITHOUT it. Zero hosts → missing 
 
 **3.4 Find the nested content** — the timeline to nest must ALREADY exist:
 `AssetDatabase.FindAssets("t:TimelineAsset")`, read real paths, choose with the designer. Building
-nested timeline CONTENT is the content specialist's job ("no egg" boundary); creating an empty host
+nested timeline CONTENT is the content specialist's job (missing-prerequisite boundary); creating an empty host
 timeline + this track is yours. If recipe 4.1 will run, confirm the chosen sub-director name is
 unused and record `PRE|subDirectorExisted=<bool>`.
 

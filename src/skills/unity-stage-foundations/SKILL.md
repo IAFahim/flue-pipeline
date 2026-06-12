@@ -18,7 +18,7 @@ built (§6). In-domain asset creation: `EntityLinkSchema` assets only. OUT of do
 timelines/tracks/clips and director bindings (each track specialist's job), Essence
 STAT schema assets (e.g. stat keys under project settings — they must pre-exist;
 an Essence/settings specialist or the designer provides them), packages (missing
-package = "no egg", protocol §6). Behave per unity-agent-protocol; operate the
+package = a missing prerequisite, protocol §6). Behave per unity-agent-protocol; operate the
 editor per unity-cli.
 
 ## 2. PORTABLE SEMANTICS
@@ -167,11 +167,11 @@ play mode. Follow the unity-cli Safe Loop. Names below are parameters — discov
 in THIS project; never assume the worked example (§5).
 
 **Gap classification rule (state it in your memory card):** a missing PACKAGE/type
-(§3.1) is "no egg" — report per protocol §6, do not improvise. A missing scene OBJECT
+(§3.1) is a missing prerequisite — report per protocol §6, do not improvise. A missing scene OBJECT
 or authoring COMPONENT is exactly your job — it goes on the build list (§4). A missing
 stat schema asset or timeline asset is another specialist's gap — report it.
 
-**3.1 Package/type audit (else "no egg"):** resolve every §2 type by reflection over
+**3.1 Package/type audit (else a missing prerequisite):** resolve every §2 type by reflection over
 ALL loaded assemblies (search by simple name; report the real namespace found — never
 conclude "missing" from one `Type.GetType` probe):
 ```csharp
@@ -182,11 +182,11 @@ var sb = new System.Text.StringBuilder();
 foreach (var n in wanted) { var hits = System.AppDomain.CurrentDomain.GetAssemblies()
     .SelectMany(a => { try { return a.GetTypes(); } catch { return new System.Type[0]; } })
     .Where(t => t.Name == n).ToList();
-  sb.AppendLine((hits.Count==0 ? "NO_EGG|" : "TYPE|") + n + "|" +
+  sb.AppendLine((hits.Count==0 ? "MISSING_PREREQUISITE|" : "TYPE|") + n + "|" +
     string.Join(";", hits.Select(t => t.FullName + ",asm=" + t.Assembly.GetName().Name))); }
 return sb.ToString() + "dataPath=" + UnityEngine.Application.dataPath;
 ```
-A NO_EGG on a Timeline/Core/Reaction/Essence type ends the job (protocol §6). A NO_EGG
+A MISSING_PREREQUISITE on a Timeline/Core/Reaction/Essence type ends the job (protocol §6). A MISSING_PREREQUISITE
 on the physics types only blocks §4.6/§4.7 — build the rest, report the gap.
 
 **3.2 Scene + SubScene audit:** run the unity-cli First Command (active scene path,

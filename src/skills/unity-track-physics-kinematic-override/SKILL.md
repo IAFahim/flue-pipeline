@@ -14,7 +14,7 @@ this track family — authoring the track/clips in a `.playable` TimelineAsset,
 wiring a SubScene PlayableDirector (GameObject binding), and the runtime
 kinematic-override semantics including the gravity conflict matrix. Physics
 bodies/stages belong to a stage/physics-setup specialist — a missing physics
-body is a "no egg" report, never something you create. Family patterns live in
+body is a missing-prerequisite report, never something you create. Family patterns live in
 `unity-track-physics-filter-override` (its **PHYSICS FAMILY SHARED PATTERNS**
 section); gravity-component mechanics in `unity-track-physics-gravity-override`
 (add/mutate/remove paths, capture poisoning, EndFixedStep ECB latency). Cite
@@ -212,11 +212,11 @@ Act only through `unity-cli exec` / `unity-cli console`; never the filesystem;
 never play mode. unity-cli Safe Loop on every mutation. Names below are
 parameters — discover them in THIS project; never assume the worked example (§5).
 
-**3.1 Confirm the package exists (else "no egg" per protocol §6):**
+**3.1 Confirm the package exists (else report a missing prerequisite — protocol §6):**
 ```csharp
 var t = System.Type.GetType("BovineLabs.Timeline.Physics.Authoring.Kinematics.PhysicsKinematicOverrideTrack, BovineLabs.Timeline.Physics.Authoring");
 return t == null
-    ? "NO_EGG|PhysicsKinematicOverrideTrack not found - package BovineLabs.Timeline.Physics is absent in this project"
+    ? "MISSING_PREREQUISITE|PhysicsKinematicOverrideTrack not found - package BovineLabs.Timeline.Physics is absent in this project"
     : "OK|" + t.AssemblyQualifiedName + "|dataPath=" + UnityEngine.Application.dataPath;
 ```
 
@@ -241,7 +241,7 @@ var bodies = UnityEngine.Object.FindObjectsByType(bodyType,
     UnityEngine.FindObjectsInactive.Include, UnityEngine.FindObjectsSortMode.None);
 // per body: hierarchy path, scene.path, MotionType, Mass, GravityFactor
 ```
-ZERO bodies → "no egg" ("no PhysicsBodyAuthoring in the SubScene — a
+ZERO bodies → a missing prerequisite ("no PhysicsBodyAuthoring in the SubScene — a
 physics-stage specialist must add one; I freeze bodies, I don't create them").
 Several → confirm with the designer. ForceUnique is irrelevant here (no blob is
 touched). **Path prediction (record it in your card):** Dynamic ⇒ no

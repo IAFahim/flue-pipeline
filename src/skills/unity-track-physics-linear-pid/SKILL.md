@@ -10,7 +10,7 @@ You are the specialist for **`PhysicsLinearPIDTrack`** and **`PhysicsLinearPIDCl
 package `BovineLabs.Timeline.Physics`, ns `BovineLabs.Timeline.Physics.Authoring.PIDs` — bound to
 a **`PhysicsBodyAuthoring` COMPONENT**. Scope: authoring track/clips in a `.playable`, wiring a
 SubScene PlayableDirector, the runtime position-motor semantics. Physics bodies, Targets slots, and
-stat setups are OTHER specialists' domains (protocol §6: report "no egg", never improvise).
+stat setups are OTHER specialists' domains (protocol §6: report a missing prerequisite, never improvise).
 **The SHARED PID CORE lives in `unity-track-physics-angular-pid`** (PidTuning, the
 `ComputePidForce` anti-windup kernel, `PidStateData` lifecycle, `PendingForce` drain,
 `StatStrengthUtility.Resolve` triple trap, tuning doctrine + presets); family patterns in
@@ -164,10 +164,10 @@ Act only through `unity-cli exec` / `unity-cli console`; never the filesystem; n
 unity-cli Safe Loop on every mutation. Names below are parameters — discover them in THIS project;
 never assume the worked example (§5).
 
-**3.1 Confirm the package exists (else "no egg" per protocol §6):**
+**3.1 Confirm the package exists (else report a missing prerequisite — protocol §6):**
 ```csharp
 var t = System.Type.GetType("BovineLabs.Timeline.Physics.Authoring.PIDs.PhysicsLinearPIDTrack, BovineLabs.Timeline.Physics.Authoring");
-return t == null ? "NO_EGG|PhysicsLinearPIDTrack not found - package BovineLabs.Timeline.Physics absent" : "OK|" + t.AssemblyQualifiedName + "|dataPath=" + UnityEngine.Application.dataPath;
+return t == null ? "MISSING_PREREQUISITE|PhysicsLinearPIDTrack not found - package BovineLabs.Timeline.Physics absent" : "OK|" + t.AssemblyQualifiedName + "|dataPath=" + UnityEngine.Application.dataPath;
 ```
 
 **3.2 Find the active scene + SubScene(s):** run the unity-cli skill's First Command (scene path,
@@ -187,7 +187,7 @@ var bodies = UnityEngine.Object.FindObjectsByType<Unity.Physics.Authoring.Physic
 // print per body: hierarchy path, scene.path, MotionType, Mass, sibling components
 // (TargetsAuthoring? StatAuthoring?) - confirm with the designer if more than one.
 ```
-ZERO bodies in the SubScene → "no egg": a physics-stage specialist must add one; you bind bodies,
+ZERO bodies in the SubScene → a missing prerequisite: a physics-stage specialist must add one; you bind bodies,
 you don't create them. Prerequisites: TargetLocal/InitialLocal/LineOfSight/Flee need the BODY's
 Targets slot populated (TargetsAuthoring — the stage specialist's job; a lost slot triggers the
 silent fallback matrix); World needs nothing. `strengthStat` needs a stat schema asset — discover

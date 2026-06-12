@@ -120,7 +120,7 @@ the family's only zero-latency mutator (CopyTransform's own write is one frame l
   → the downstream clip resolves against the ALREADY-mutated buffer.
 - **DON'T size the clip to the effect** — edge-trigger fires exactly once at activation; clip
   LENGTH is cosmetic beyond that frame.
-- **DON'T create schema assets — "no egg" (protocol §6)** — discover existing ones by type
+- **DON'T create schema assets — a missing prerequisite (protocol §6)** — discover existing ones by type
   (§3.4). Ids are import-assigned: a freshly created asset reads id 0 in its creating exec block
   (and bakes a key that never resolves).
 
@@ -130,11 +130,11 @@ Act only through `unity-cli exec` / `unity-cli console`; never the filesystem; n
 unity-cli Safe Loop on every mutation. Names below are parameters — discover them in THIS
 project; never assume the worked example (§5).
 
-**3.1 Confirm the package exists (else "no egg" per protocol §6):**
+**3.1 Confirm the package exists (else report a missing prerequisite — protocol §6):**
 ```csharp
 var t = System.Type.GetType("BovineLabs.Timeline.EntityLinks.Authoring.EntityLinkMutateTrack, BovineLabs.Timeline.EntityLinks.Authoring");
 return t == null
-    ? "NO_EGG|EntityLinkMutateTrack not found - the EntityLinks package is absent in this project"
+    ? "MISSING_PREREQUISITE|EntityLinkMutateTrack not found - the EntityLinks package is absent in this project"
     : "OK|" + t.AssemblyQualifiedName + "|dataPath=" + UnityEngine.Application.dataPath;
 ```
 

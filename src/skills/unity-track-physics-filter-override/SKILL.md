@@ -13,7 +13,7 @@ You are the specialist for **`PhysicsFilterOverrideTrack`** and
 track family — authoring the track/clips in a `.playable` TimelineAsset, wiring a
 SubScene PlayableDirector (GameObject binding), the ForceUnique prerequisite, and
 the runtime filter-override semantics. Physics bodies/stages belong to a
-stage/physics-setup specialist — a missing physics body is a "no egg" report,
+stage/physics-setup specialist — a missing physics body is a missing-prerequisite report,
 never something you create. Gravity → `unity-track-physics-gravity-override`;
 kinematic freezing → `unity-track-physics-kinematic-override`. **This skill also
 carries the PHYSICS FAMILY SHARED PATTERNS reference** (§2) that sibling physics
@@ -189,11 +189,11 @@ Act only through `unity-cli exec` / `unity-cli console`; never the filesystem;
 never play mode. unity-cli Safe Loop on every mutation. Names below are
 parameters — discover them in THIS project; never assume the worked example (§5).
 
-**3.1 Confirm the package exists (else "no egg" per protocol §6):**
+**3.1 Confirm the package exists (else report a missing prerequisite — protocol §6):**
 ```csharp
 var t = System.Type.GetType("BovineLabs.Timeline.Physics.Authoring.Filters.PhysicsFilterOverrideTrack, BovineLabs.Timeline.Physics.Authoring");
 return t == null
-    ? "NO_EGG|PhysicsFilterOverrideTrack not found - package BovineLabs.Timeline.Physics is absent in this project"
+    ? "MISSING_PREREQUISITE|PhysicsFilterOverrideTrack not found - package BovineLabs.Timeline.Physics is absent in this project"
     : "OK|" + t.AssemblyQualifiedName + "|dataPath=" + UnityEngine.Application.dataPath;
 ```
 
@@ -219,10 +219,10 @@ var bodies = UnityEngine.Object.FindObjectsByType(bodyType,
 // per body: hierarchy path, scene.path, MotionType, Mass; from its PhysicsShapeAuthoring:
 // ShapeType + ForceUnique (property, or SerializedObject "m_ForceUnique")
 ```
-ZERO bodies → "no egg" ("no PhysicsBodyAuthoring in the SubScene — a
+ZERO bodies → a missing prerequisite ("no PhysicsBodyAuthoring in the SubScene — a
 physics-stage specialist must add one; I override filters, I don't create
 bodies"). Several → confirm with the designer. **Prerequisite (this track's
-egg-quality test): `ForceUnique` on the chosen body's shape must be true**, or
+readiness test): `ForceUnique` on the chosen body's shape must be true**, or
 the override warn-and-skips at runtime (silently in Bursted players). If false:
 report as a Gap, or — only with designer approval (it changes the body's bake)
 — flip it per recipe 4.1 with PRE capture and a journal entry.

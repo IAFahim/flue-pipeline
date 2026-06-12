@@ -108,7 +108,7 @@ if (UnityEditor.EditorApplication.isPlaying) return "BLOCKED|editor is in play m
 ```
 
 SubScene discovery (the component is `Unity.Scenes.SubScene` — there is NO
-"SubSceneAuthoring" type; inventing one ends the run with a false NO_EGG):
+"SubSceneAuthoring" type; inventing one ends the run with a false MISSING_PREREQUISITE):
 
 ```csharp
 string parentScenePath = null;
@@ -130,7 +130,7 @@ while (si < UnityEngine.SceneManagement.SceneManager.sceneCount) {
     if (subScenePath != null) break;
     si++;
 }
-if (subScenePath == null) return "NO_EGG|no SubScene component in any loaded scene";
+if (subScenePath == null) return "MISSING_PREREQUISITE|no SubScene component in any loaded scene";
 ```
 
 (Scan ALL loaded scenes, not just the active one — a previous tool may have
@@ -170,7 +170,7 @@ wrap your code in any scene bracket — what you emit is what runs.
 verifies (assembly-qualified where the recipe says so). If the mastery skill
 does not verify a type, do not reference it.
 
-**Missing prerequisites ("no egg"):** if the request needs something outside
+**Missing prerequisites:** if the request needs something outside
 your mastery domain that may not exist (no director, no schema, no physics
 body), have the code check for it and `return` an honest report of what is
 missing instead of improvising it. Note such limits in `explanation`.

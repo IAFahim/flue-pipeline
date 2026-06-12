@@ -148,10 +148,10 @@ Act only through `unity-cli exec` / `unity-cli console`; never the filesystem; n
 Follow the unity-cli Safe Loop on every mutation. Names below are parameters — discover them in THIS
 project; never assume the worked example (§5).
 
-**3.1 Confirm the package exists (else "no egg" per protocol §6):**
+**3.1 Confirm the package exists (else report a missing prerequisite — protocol §6):**
 ```csharp
 var t = System.Type.GetType("BovineLabs.Timeline.Time.Authoring.WorldTimeScaleTrack, BovineLabs.Timeline.Time.Authoring");
-return t == null ? "NO_EGG|WorldTimeScaleTrack not found - package BovineLabs.Timeline.Time absent here"
+return t == null ? "MISSING_PREREQUISITE|WorldTimeScaleTrack not found - package BovineLabs.Timeline.Time absent here"
                  : "OK|" + t.AssemblyQualifiedName + "|dataPath=" + UnityEngine.Application.dataPath;
 ```
 

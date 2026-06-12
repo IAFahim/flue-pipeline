@@ -170,11 +170,11 @@ Act only through `unity-cli exec` / `unity-cli console`; never the filesystem; n
 unity-cli Safe Loop on every mutation. Names below are parameters — discover them in THIS
 project; never assume the worked example (§5).
 
-**3.1 Confirm the package exists (else "no egg" per protocol §6):**
+**3.1 Confirm the package exists (else report a missing prerequisite — protocol §6):**
 ```csharp
 var t = System.Type.GetType("BovineLabs.Timeline.EntityLinks.Authoring.EntityLinkParentTrack, BovineLabs.Timeline.EntityLinks.Authoring");
 return t == null
-    ? "NO_EGG|EntityLinkParentTrack not found - the EntityLinks package is absent in this project"
+    ? "MISSING_PREREQUISITE|EntityLinkParentTrack not found - the EntityLinks package is absent in this project"
     : "OK|" + t.AssemblyQualifiedName + "|dataPath=" + UnityEngine.Application.dataPath;
 ```
 
@@ -196,7 +196,7 @@ protocol §6.
   object itself carries the source).
 - Schemas by TYPE with live id dump: `AssetDatabase.FindAssets("t:EntityLinkSchema")` →
   path/guid/imported id (id==0 ⇒ unusable). **NEVER create schema assets** — out of domain
-  ("no egg"); report a missing schema as a missing prerequisite.
+  (a missing prerequisite); report a missing schema as a missing prerequisite.
 
 **3.5 Capture the chosen director's existing state — this is pre-state (`PRE|`)**:
 ```csharp

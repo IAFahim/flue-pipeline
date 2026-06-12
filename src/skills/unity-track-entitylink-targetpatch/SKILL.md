@@ -123,7 +123,7 @@ not one-frame-latent like CopyTransform.
 - **DO produce ALL `.sceneWithBuildSettings` artifacts when forcing a bake** — the
   cached-artifact trap; a clean rebake is proven by a CHANGED artifact hash with zero new error
   lines, not by silence. (Recipe in `unity-track-entitylink-mutate` §3.6.)
-- **DON'T create schema assets — "no egg" (protocol §6)** — discover existing ones by type
+- **DON'T create schema assets — a missing prerequisite (protocol §6)** — discover existing ones by type
   (§3.4); ids are import-assigned, id 0 never resolves.
 
 ### EntityLinks FAMILY CLOSING SUMMARY (lessons 07–10 — portable)
@@ -166,11 +166,11 @@ Act only through `unity-cli exec` / `unity-cli console`; never the filesystem; n
 unity-cli Safe Loop on every mutation. Names below are parameters — discover them in THIS
 project; never assume the worked example (§5).
 
-**3.1 Confirm the package exists (else "no egg" per protocol §6):**
+**3.1 Confirm the package exists (else report a missing prerequisite — protocol §6):**
 ```csharp
 var t = System.Type.GetType("BovineLabs.Timeline.EntityLinks.Authoring.EntityLinkTargetPatchTrack, BovineLabs.Timeline.EntityLinks.Authoring");
 return t == null
-    ? "NO_EGG|EntityLinkTargetPatchTrack not found - the EntityLinks package is absent in this project"
+    ? "MISSING_PREREQUISITE|EntityLinkTargetPatchTrack not found - the EntityLinks package is absent in this project"
     : "OK|" + t.AssemblyQualifiedName + "|dataPath=" + UnityEngine.Application.dataPath;
 ```
 
@@ -193,7 +193,7 @@ protocol §6.
   assumption.
 - Schemas by TYPE with live id dump: `AssetDatabase.FindAssets("t:EntityLinkSchema")` →
   path/guid/imported id (id==0 ⇒ unusable; cast to `UnityEngine.Object` before `GetAssetPath`).
-  **NEVER create schema assets** — out of domain ("no egg").
+  **NEVER create schema assets** — out of domain (a missing prerequisite).
 - Derive `ReadRootFrom` from the layout (`Self` when the bound object itself carries the source
   — the default `Source` is a trap on any binding with an unset Source slot).
 

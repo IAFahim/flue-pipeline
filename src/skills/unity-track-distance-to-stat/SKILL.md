@@ -138,12 +138,12 @@ TRUNCATES (`(int)value`).
 Act only through `unity-cli exec` / `unity-cli console`; never the filesystem; never play mode. Follow the unity-cli Safe Loop
 on every mutation. Names below are parameters — discover them in THIS project; never assume the worked example (§5).
 
-**3.1 Confirm the package exists (else "no egg" per protocol §6):**
+**3.1 Confirm the package exists (else report a missing prerequisite — protocol §6):**
 ```csharp
 var t = System.Type.GetType("BovineLabs.Timeline.Distance.Authoring.DistanceToStatTrack, BovineLabs.Timeline.Distance.Authoring");
 if (t == null) foreach (var asm in System.AppDomain.CurrentDomain.GetAssemblies())
     { t = asm.GetType("BovineLabs.Timeline.Distance.Authoring.DistanceToStatTrack"); if (t != null) break; }
-return t == null ? "NO_EGG|DistanceToStatTrack not found - package BovineLabs.Timeline.Distance is absent" : "OK|" + t.AssemblyQualifiedName + "|dataPath=" + UnityEngine.Application.dataPath;
+return t == null ? "MISSING_PREREQUISITE|DistanceToStatTrack not found - package BovineLabs.Timeline.Distance is absent" : "OK|" + t.AssemblyQualifiedName + "|dataPath=" + UnityEngine.Application.dataPath;
 ```
 
 **3.2 Find the active scene + SubScene(s):** run the unity-cli First Command; record `parentScenePath` + candidate

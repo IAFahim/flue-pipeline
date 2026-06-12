@@ -36,7 +36,7 @@ Return a structured result with two fields:
     clean state.
 
 - `gaps`: an honest string of anything a follow-up specialist needs: missing
-  prerequisites you discovered ("no egg"), `EXPECTED:`-only claims that could
+  prerequisites you discovered (a missing prerequisite), `EXPECTED:`-only claims that could
   not be verified, checks that were impossible (e.g. need play mode), and —
   mandatory when `execOk` is `"false"` — a statement that the exec failed and
   what state the editor was likely left in. Use `""` only when there is truly

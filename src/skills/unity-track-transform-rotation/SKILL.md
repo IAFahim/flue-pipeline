@@ -122,10 +122,10 @@ Act only through `unity-cli exec` / `unity-cli console`; never the filesystem; n
 mode. Follow the unity-cli Safe Loop on every mutation. Names below are parameters —
 discover them in THIS project; never assume the worked example (§5).
 
-**3.1 Confirm the package exists (else "no egg" per protocol §6):**
+**3.1 Confirm the package exists (else report a missing prerequisite — protocol §6):**
 ```csharp
 var t = System.Type.GetType("BovineLabs.Timeline.Transform.Authoring.TransformRotationTrack, BovineLabs.Timeline.Transform.Authoring");
-return t == null ? "NO_EGG|package com.bovinelabs.timeline.transform absent in this project"
+return t == null ? "MISSING_PREREQUISITE|package com.bovinelabs.timeline.transform absent in this project"
     : "OK|" + t.AssemblyQualifiedName + "|dataPath=" + UnityEngine.Application.dataPath;
 ```
 
