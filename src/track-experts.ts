@@ -4,6 +4,7 @@ import agentProtocol from './skills/unity-agent-protocol/SKILL.md' with { type: 
 import trackTask from './skills/track-task/SKILL.md' with { type: 'skill' };
 import trackUndo from './skills/track-undo/SKILL.md' with { type: 'skill' };
 import stageFoundations from './skills/unity-stage-foundations/SKILL.md' with { type: 'skill' };
+import augmentArchitecture from './skills/unity-augment-architecture/SKILL.md' with { type: 'skill' };
 import distanceToStat from './skills/unity-track-distance-to-stat/SKILL.md' with { type: 'skill' };
 import entityLinkCopyTransform from './skills/unity-track-entitylink-copytransform/SKILL.md' with { type: 'skill' };
 import entityLinkMutate from './skills/unity-track-entitylink-mutate/SKILL.md' with { type: 'skill' };
@@ -29,7 +30,8 @@ import worldTimeScale from './skills/unity-track-world-timescale/SKILL.md' with 
 // One single-purpose expert per trained track mastery skill. Each carries the
 // hardened unity-cli operating skill, the unity-agent-protocol behavioral
 // contract, the track-task result contract, the track-undo pass-2 contract,
-// and exactly one track mastery skill (its verified recipes + edge-case rules).
+// the unity-stage-foundations skill (so it can build the stage its track
+// depends on), and its one track mastery skill (verified recipes + edge cases).
 //
 // track-undo MUST be declared here even though the workflow passes the skill
 // reference to session.skill() directly: the runtime's `activate_skill` tool
@@ -39,9 +41,19 @@ import worldTimeScale from './skills/unity-track-world-timescale/SKILL.md' with 
 // matching skills first, so an undeclared track-undo makes that activation
 // call fail ("[flue] Skill ... not registered") before the model recovers.
 function trackExpert(topic: string, masterySkill: Skill) {
+	// Every specialist also carries unity-stage-foundations: almost no track can
+	// do anything useful without the timeline stage (director, actor, target,
+	// physics ball, …) existing first, so the specialist must be able to AUDIT
+	// and BUILD the missing stage itself rather than stopping on the missing
+	// prerequisite. The stage expert's own mastery skill IS that skill, so
+	// dedupe to avoid listing it twice.
+	const skills =
+		masterySkill === stageFoundations
+			? [unityCli, agentProtocol, trackTask, trackUndo, stageFoundations]
+			: [unityCli, agentProtocol, trackTask, trackUndo, stageFoundations, masterySkill];
 	return createAgent(() => ({
 		model: 'minimax/MiniMax-M2.7',
-		skills: [unityCli, agentProtocol, trackTask, trackUndo, masterySkill],
+		skills,
 		instructions:
 			`You are the ${topic} specialist. You behave per the unity-agent-protocol ` +
 			'skill: discovery over assumption — the named objects, asset paths, and ids ' +
@@ -51,9 +63,13 @@ function trackExpert(topic: string, masterySkill: Skill) {
 			'and NO Unity project in your own sandbox: never shell out to unity-cli and ' +
 			'never give up because it is missing — you AUTHOR C# that the runtime ' +
 			'executes in the live Editor, so all discovery happens inside that code. ' +
-			'Apply the track-task skill to the given request using your track mastery ' +
-			"skill's verified recipes, and return exactly the structured result the " +
-			'track-task skill defines.',
+			'You ALSO carry the unity-stage-foundations skill: before your track work, ' +
+			'audit the timeline stage and, when the director/actor/target/physics body ' +
+			'your request needs is missing, BUILD it with that skill first (recording its ' +
+			'undo just like any other mutation) — do not stop merely because the stage is ' +
+			'not set up yet. Then apply the track-task skill to the request using your ' +
+			"track mastery skill's verified recipes, and return exactly the structured " +
+			'result the track-task skill defines.',
 	}));
 }
 
@@ -92,34 +108,104 @@ const trackExperts: Record<string, ReturnType<typeof trackExpert>> = {
 // agent held everything" versus the disciplined one-skill specialists. It runs
 // through the same track-task flow, so it still returns an evidenced memory
 // card with a deterministic undo journal. Reached via track key "__boss__".
-const allMastery: Skill[] = [
-	stageFoundations, distanceToStat, entityLinkCopyTransform, entityLinkMutate,
-	entityLinkParent, entityLinkTargetPatch, essenceEvent, essenceIntrinsic,
-	essenceStat, physicsAngularPid, physicsDrag, physicsFilterOverride,
-	physicsForce, physicsGravityOverride, physicsKinematicOverride,
-	physicsLinearPid, subDirector, timelineTimeScale, transformPosition,
-	transformRotation, transformScale, worldTimeScale,
-];
+// name (== mastery skill name) -> skill, so a custom boss can be composed from
+// a chosen SUBSET of skills picked in the notebook. The notebook shows the
+// token cost of each and lets the designer trim the boss before sending.
+export const masteryByName: Record<string, Skill> = {
+	'unity-stage-foundations': stageFoundations,
+	'unity-track-distance-to-stat': distanceToStat,
+	'unity-track-entitylink-copytransform': entityLinkCopyTransform,
+	'unity-track-entitylink-mutate': entityLinkMutate,
+	'unity-track-entitylink-parent': entityLinkParent,
+	'unity-track-entitylink-targetpatch': entityLinkTargetPatch,
+	'unity-track-essence-event': essenceEvent,
+	'unity-track-essence-intrinsic': essenceIntrinsic,
+	'unity-track-essence-stat': essenceStat,
+	'unity-track-physics-angular-pid': physicsAngularPid,
+	'unity-track-physics-drag': physicsDrag,
+	'unity-track-physics-filter-override': physicsFilterOverride,
+	'unity-track-physics-force': physicsForce,
+	'unity-track-physics-gravity-override': physicsGravityOverride,
+	'unity-track-physics-kinematic-override': physicsKinematicOverride,
+	'unity-track-physics-linear-pid': physicsLinearPid,
+	'unity-track-subdirector': subDirector,
+	'unity-track-timeline-timescale': timelineTimeScale,
+	'unity-track-transform-position': transformPosition,
+	'unity-track-transform-rotation': transformRotation,
+	'unity-track-transform-scale': transformScale,
+	'unity-track-world-timescale': worldTimeScale,
+};
 
-const bossExpert = createAgent(() => ({
+const allMastery: Skill[] = Object.values(masteryByName);
+
+const BOSS_INSTRUCTIONS =
+	'You are the ULTIMATE BOSS — the anti-specialist. You carry a set of ' +
+	'mastery skills (DOTS Timeline track families and/or the stage ' +
+	'foundations). For the given request, decide which of the skills you carry ' +
+	'apply, activate them, and apply the track-task skill using their verified ' +
+	'recipes — you MAY combine several skills in one job. If the request needs a ' +
+	'skill you do NOT carry, say so honestly and stop rather than improvising it. ' +
+	'You behave per unity-agent-protocol: discovery over assumption (the named ' +
+	'objects, asset paths, and ids in each mastery skill are worked examples to ' +
+	'rediscover in THIS project), capture PRE| pre-state before every mutation, ' +
+	'never claim what you cannot evidence. You have NO unity-cli and NO Unity ' +
+	'project in your own sandbox: never shell out to unity-cli and never give up ' +
+	'because it is missing — you AUTHOR C# that the runtime executes in the live ' +
+	'Editor. Return exactly the structured result the track-task skill defines.';
+
+// Build a boss carrying the shared skills plus the named mastery subset
+// (deduped, unknown names ignored). An empty/absent list falls back to ALL
+// mastery skills — the original full boss.
+export function buildBoss(masteryNames: string[] = []) {
+	const chosen = [...new Set(masteryNames)]
+		.map((n) => masteryByName[n])
+		.filter((s): s is Skill => Boolean(s));
+	const mastery = chosen.length ? chosen : allMastery;
+	return createAgent(() => ({
+		model: 'minimax/MiniMax-M2.7',
+		skills: [unityCli, agentProtocol, trackTask, trackUndo, ...mastery],
+		instructions: BOSS_INSTRUCTIONS,
+	}));
+}
+
+// The full boss (every mastery skill) is the default registry entry, reached
+// via track key "__boss__"; the workflow swaps in a composed subset when the
+// payload carries a `skills` list.
+trackExperts['__boss__'] = buildBoss();
+
+// --- D1 — The Designer -------------------------------------------------------
+// The whole-mechanic generalist. Unlike the boss (which holds the 22 per-track
+// timeline masteries), D1 carries the COMPOSITION skill 'unity-augment-architecture'
+// — how Input → Event → Reaction → Action → ObjectDefinition → TRA → EntityLink →
+// Essence tie together — on top of the stage foundations and the shared
+// operating/behaviour/result skills. It authors the full reaction/spawn/payload
+// chain a designer describes (e.g. a wiki augment), with evidence + undo. Reached
+// via track key "__d1__". As the Tier-1 authoring skills (unity-reaction-core,
+// unity-object-definition, unity-essence-actions, unity-tra-payload,
+// unity-lifecycle-init) are trained, add them to this skills list.
+const d1Expert = createAgent(() => ({
 	model: 'minimax/MiniMax-M2.7',
-	skills: [unityCli, agentProtocol, trackTask, trackUndo, ...allMastery],
+	skills: [unityCli, agentProtocol, trackTask, trackUndo, stageFoundations, augmentArchitecture],
 	instructions:
-		'You are the ULTIMATE BOSS — the anti-specialist. You carry EVERY ' +
-		'mastery skill at once: all the DOTS Timeline track families plus the ' +
-		'stage foundations. For the given request, decide which mastery skill(s) ' +
-		'apply, activate them, and apply the track-task skill using their ' +
-		'verified recipes — you MAY combine several skills in one job. You behave ' +
-		'per unity-agent-protocol: discovery over assumption (the named objects, ' +
-		'asset paths, and ids in each mastery skill are worked examples to ' +
-		'rediscover in THIS project), capture PRE| pre-state before every ' +
-		'mutation, never claim what you cannot evidence. You have NO unity-cli ' +
-		'and NO Unity project in your own sandbox: never shell out to unity-cli ' +
-		'and never give up because it is missing — you AUTHOR C# that the runtime ' +
-		'executes in the live Editor. Return exactly the structured result the ' +
-		'track-task skill defines.',
+		'You are D1 — the Designer: a whole-mechanic generalist, not a single-track ' +
+		'specialist. A designer describes a complete gameplay augment in plain terms; ' +
+		'you compose it. You behave per unity-agent-protocol: discovery over assumption ' +
+		'(the object/asset/event names in the architecture skill are worked examples to ' +
+		'rediscover in THIS project), capture PRE| pre-state before every mutation, ' +
+		'never claim what you cannot evidence. You have NO unity-cli and NO Unity project ' +
+		'in your own sandbox: never shell out to unity-cli and never give up because it ' +
+		'is missing — you AUTHOR C# that the runtime executes in the live Editor. Use the ' +
+		"unity-augment-architecture skill's five-layer model (Input→Event, Reaction, " +
+		'Action, ObjectDefinition→prefab, EntityLink/Essence) to decompose the request, ' +
+		'pick the canonical chain(s), and build the reactions, object definitions, ' +
+		'prefabs, TRA payloads, links and lifecycle/cleanup — reusing what exists before ' +
+		'creating. Use unity-stage-foundations when a prerequisite stage object is ' +
+		'missing. If the mechanic needs a Timeline clip you cannot author safely, or a ' +
+		'prerequisite (Essence/input event/stage) is missing, say so honestly and stop — ' +
+		'do not improvise. Return exactly the structured result the track-task skill ' +
+		'defines, with an undo journal that reverses every change.',
 }));
 
-trackExperts['__boss__'] = bossExpert;
+trackExperts['__d1__'] = d1Expert;
 
 export default trackExperts;

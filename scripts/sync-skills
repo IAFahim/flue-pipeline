@@ -21,7 +21,7 @@ echo "== sync-skills: $SRC -> $DST"
 
 synced=0
 names=()
-for dir in "$SRC"/unity-cli "$SRC"/unity-agent-protocol "$SRC"/unity-stage-foundations "$SRC"/unity-track-*; do
+for dir in "$SRC"/unity-cli "$SRC"/unity-agent-protocol "$SRC"/unity-stage-foundations "$SRC"/unity-augment-architecture "$SRC"/unity-track-*; do
 	[ -d "$dir" ] || continue
 	name="$(basename "$dir")"
 	[ -f "$dir/SKILL.md" ] || { echo "SKIP $name (no SKILL.md)"; continue; }
