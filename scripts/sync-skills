@@ -65,6 +65,7 @@ else
 		[unity-track-physics-gravity-override]=BovineLabs.Timeline.Physics
 		[unity-track-physics-kinematic-override]=BovineLabs.Timeline.Physics
 		[unity-track-physics-filter-override]=BovineLabs.Timeline.Physics
+		[unity-track-stateful-trigger]=BovineLabs.Timeline.Physics
 		[unity-track-essence-stat]=BovineLabs.Timeline.Essence
 		[unity-track-essence-event]=BovineLabs.Timeline.Essence
 		[unity-track-essence-intrinsic]=BovineLabs.Timeline.Essence
@@ -86,6 +87,9 @@ else
 		[unity-agent-protocol]=BovineLabs.Timeline.Core
 		[unity-player-input]=BovineLabs.Timeline.Core
 		[unity-augment-architecture]=BovineLabs.Timeline.Core
+		[unity-mechanic-diagrams]=BovineLabs.Timeline.Core
+		[unity-combos]=BovineLabs.Timeline.Core
+		[unity-mechanic-cookbook]=BovineLabs.Timeline.Core
 	)
 	dist=0
 	for name in "${names[@]}"; do

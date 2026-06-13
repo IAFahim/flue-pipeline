@@ -35,6 +35,7 @@ import trackPlayerInputs from './skills/unity-track-player-inputs/SKILL.md' with
 import trackUi from './skills/unity-track-ui/SKILL.md' with { type: 'skill' };
 import trackGridInfluence from './skills/unity-track-grid-influence/SKILL.md' with { type: 'skill' };
 import trackParenting from './skills/unity-track-parenting/SKILL.md' with { type: 'skill' };
+import trackStatefulTrigger from './skills/unity-track-stateful-trigger/SKILL.md' with { type: 'skill' };
 
 // The default model every expert runs on. Any request may override it (the
 // track-task workflow threads `payload.model` through to expertFor), so the
@@ -128,6 +129,7 @@ const trackExperts: Record<string, ReturnType<typeof trackExpert>> = {
 	'unity-track-ui': trackExpert('UI tracks (UxmlView / TextReveal / DataDisplay)', trackUi),
 	'unity-track-grid-influence': trackExpert('Grid Influence tracks', trackGridInfluence),
 	'unity-track-parenting': trackExpert('Parenting (TemporaryDetach) track', trackParenting),
+	'unity-track-stateful-trigger': trackExpert('StatefulTriggerTrack + PhysicsTriggerInstantiateClip (trigger-spawn)', trackStatefulTrigger),
 };
 
 // --- The Ultimate Boss -------------------------------------------------------
@@ -168,6 +170,7 @@ export const masteryByName: Record<string, Skill> = {
 	'unity-track-ui': trackUi,
 	'unity-track-grid-influence': trackGridInfluence,
 	'unity-track-parenting': trackParenting,
+	'unity-track-stateful-trigger': trackStatefulTrigger,
 };
 
 const allMastery: Skill[] = Object.values(masteryByName);
