@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 // NOTE: the expert registry lives OUTSIDE src/agents/ on purpose — flue treats
 // every src/agents/*.ts as an addressable agent and requires it to
 // default-export createAgent(...); the registry is a Record consumed via init().
-import trackExperts, { buildBoss } from '../track-experts';
+import trackExperts, { buildBoss, expertFor, DEFAULT_MODEL } from '../track-experts';
 import trackTask from '../skills/track-task/SKILL.md' with { type: 'skill' };
 import trackUndo from '../skills/track-undo/SKILL.md' with { type: 'skill' };
 
@@ -63,8 +63,14 @@ export async function run({ init, payload, id }: FlueContext) {
 	const skillNames: string[] = Array.isArray((payload as any).skills)
 		? (payload as any).skills.map(String).filter(Boolean)
 		: [];
-	const expert =
-		track === '__boss__' && skillNames.length
+	// Optional per-request model override (any provider/model the runtime
+	// supports). With an override we rebuild the expert on that model; without
+	// one we use the prebuilt registry (default model). The Editor/unity-cli
+	// side passes this, so callers pick the model without touching flue.
+	const model = String((payload as any).model ?? '').trim();
+	const expert = model
+		? expertFor(track, model, skillNames)
+		: track === '__boss__' && skillNames.length
 			? buildBoss(skillNames)
 			: trackExperts[track];
 	if (!expert) {
@@ -168,5 +174,6 @@ export async function run({ init, payload, id }: FlueContext) {
 		gaps,
 		session: sessionName,
 		skills: skillNames,
+		model: model || DEFAULT_MODEL,
 	};
 }

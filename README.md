@@ -37,6 +37,16 @@ specialist (one MiniMax agent per DOTS Timeline track family), gets back
 C# raw through `unity-cli exec` (no SubScene wrapping — the mastery recipes
 bracket scenes themselves).
 
+> **Migration in progress.** The mechanical ~65 % of every mastery recipe (the
+> SubScene bracket, director binding, field writes, verification, undo) is
+> moving into deterministic `vex` editor tools — `unity-cli timeline_create`,
+> `clip_add`, `director_bind`, `timeline_verify`, … As those land, the
+> track-task workflow prefers a tool call over raw `exec`; `exec` stays the
+> fallback for what no tool covers yet, and undo becomes a tool output instead
+> of a second model pass. The tool design lives in the sibling
+> `../unity-cli-tooling/` corpus; the C# in the BovineLabs packages' `.Editor`
+> assemblies.
+
 Payload:
 
 ```json

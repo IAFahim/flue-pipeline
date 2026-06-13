@@ -1,8 +1,10 @@
 import { createAgent, type Skill } from '@flue/runtime';
 import unityCli from './skills/unity-cli/SKILL.md' with { type: 'skill' };
 import agentProtocol from './skills/unity-agent-protocol/SKILL.md' with { type: 'skill' };
+import playerInput from './skills/unity-player-input/SKILL.md' with { type: 'skill' };
 import trackTask from './skills/track-task/SKILL.md' with { type: 'skill' };
 import trackUndo from './skills/track-undo/SKILL.md' with { type: 'skill' };
+import chat from './skills/chat/SKILL.md' with { type: 'skill' };
 import stageFoundations from './skills/unity-stage-foundations/SKILL.md' with { type: 'skill' };
 import augmentArchitecture from './skills/unity-augment-architecture/SKILL.md' with { type: 'skill' };
 import distanceToStat from './skills/unity-track-distance-to-stat/SKILL.md' with { type: 'skill' };
@@ -27,6 +29,13 @@ import transformRotation from './skills/unity-track-transform-rotation/SKILL.md'
 import transformScale from './skills/unity-track-transform-scale/SKILL.md' with { type: 'skill' };
 import worldTimeScale from './skills/unity-track-world-timescale/SKILL.md' with { type: 'skill' };
 
+// The default model every expert runs on. Any request may override it (the
+// track-task workflow threads `payload.model` through to expertFor), so the
+// Editor / unity-cli side can drive ANY provider/model the runtime supports
+// (e.g. minimax/…, anthropic/…, openai/…) just by setting the provider key in
+// .env and passing the `provider/model` string — the model layer lives here.
+export const DEFAULT_MODEL = 'minimax/MiniMax-M2.7';
+
 // One single-purpose expert per trained track mastery skill. Each carries the
 // hardened unity-cli operating skill, the unity-agent-protocol behavioral
 // contract, the track-task result contract, the track-undo pass-2 contract,
@@ -40,7 +49,7 @@ import worldTimeScale from './skills/unity-track-world-timescale/SKILL.md' with 
 // named "track-undo"` and the system prompt tells the model to activate
 // matching skills first, so an undeclared track-undo makes that activation
 // call fail ("[flue] Skill ... not registered") before the model recovers.
-function trackExpert(topic: string, masterySkill: Skill) {
+function trackExpert(topic: string, masterySkill: Skill, model: string = DEFAULT_MODEL) {
 	// Every specialist also carries unity-stage-foundations: almost no track can
 	// do anything useful without the timeline stage (director, actor, target,
 	// physics ball, …) existing first, so the specialist must be able to AUDIT
@@ -49,10 +58,10 @@ function trackExpert(topic: string, masterySkill: Skill) {
 	// dedupe to avoid listing it twice.
 	const skills =
 		masterySkill === stageFoundations
-			? [unityCli, agentProtocol, trackTask, trackUndo, stageFoundations]
-			: [unityCli, agentProtocol, trackTask, trackUndo, stageFoundations, masterySkill];
+			? [unityCli, agentProtocol, playerInput, trackTask, trackUndo, stageFoundations]
+			: [unityCli, agentProtocol, playerInput, trackTask, trackUndo, stageFoundations, masterySkill];
 	return createAgent(() => ({
-		model: 'minimax/MiniMax-M2.7',
+		model,
 		skills,
 		instructions:
 			`You are the ${topic} specialist. You behave per the unity-agent-protocol ` +
@@ -67,7 +76,10 @@ function trackExpert(topic: string, masterySkill: Skill) {
 			'audit the timeline stage and, when the director/actor/target/physics body ' +
 			'your request needs is missing, BUILD it with that skill first (recording its ' +
 			'undo just like any other mutation) — do not stop merely because the stage is ' +
-			'not set up yet. Then apply the track-task skill to the request using your ' +
+			'not set up yet. You ALSO carry the unity-player-input skill: when a result is ' +
+			'input-triggered, you can AUTHOR C# that joins a player and drives a button/stick ' +
+			'to prove the chain fires, then verify the EFFECT (not merely that input fired). ' +
+			'Then apply the track-task skill to the request using your ' +
 			"track mastery skill's verified recipes, and return exactly the structured " +
 			'result the track-task skill defines.',
 	}));
@@ -151,19 +163,21 @@ const BOSS_INSTRUCTIONS =
 	'never claim what you cannot evidence. You have NO unity-cli and NO Unity ' +
 	'project in your own sandbox: never shell out to unity-cli and never give up ' +
 	'because it is missing — you AUTHOR C# that the runtime executes in the live ' +
-	'Editor. Return exactly the structured result the track-task skill defines.';
+	'Editor. You also carry the unity-player-input skill: to prove an input-triggered ' +
+	'mechanic works, author C# that joins a player and drives the relevant button/stick, ' +
+	'then verify the effect. Return exactly the structured result the track-task skill defines.';
 
 // Build a boss carrying the shared skills plus the named mastery subset
 // (deduped, unknown names ignored). An empty/absent list falls back to ALL
 // mastery skills — the original full boss.
-export function buildBoss(masteryNames: string[] = []) {
+export function buildBoss(masteryNames: string[] = [], model: string = DEFAULT_MODEL) {
 	const chosen = [...new Set(masteryNames)]
 		.map((n) => masteryByName[n])
 		.filter((s): s is Skill => Boolean(s));
 	const mastery = chosen.length ? chosen : allMastery;
 	return createAgent(() => ({
-		model: 'minimax/MiniMax-M2.7',
-		skills: [unityCli, agentProtocol, trackTask, trackUndo, ...mastery],
+		model,
+		skills: [unityCli, agentProtocol, playerInput, trackTask, trackUndo, ...mastery],
 		instructions: BOSS_INSTRUCTIONS,
 	}));
 }
@@ -183,9 +197,10 @@ trackExperts['__boss__'] = buildBoss();
 // via track key "__d1__". As the Tier-1 authoring skills (unity-reaction-core,
 // unity-object-definition, unity-essence-actions, unity-tra-payload,
 // unity-lifecycle-init) are trained, add them to this skills list.
-const d1Expert = createAgent(() => ({
-	model: 'minimax/MiniMax-M2.7',
-	skills: [unityCli, agentProtocol, trackTask, trackUndo, stageFoundations, augmentArchitecture],
+function buildD1(model: string = DEFAULT_MODEL) {
+	return createAgent(() => ({
+	model,
+	skills: [unityCli, agentProtocol, playerInput, trackTask, trackUndo, stageFoundations, augmentArchitecture],
 	instructions:
 		'You are D1 — the Designer: a whole-mechanic generalist, not a single-track ' +
 		'specialist. A designer describes a complete gameplay augment in plain terms; ' +
@@ -202,10 +217,55 @@ const d1Expert = createAgent(() => ({
 		'creating. Use unity-stage-foundations when a prerequisite stage object is ' +
 		'missing. If the mechanic needs a Timeline clip you cannot author safely, or a ' +
 		'prerequisite (Essence/input event/stage) is missing, say so honestly and stop — ' +
-		'do not improvise. Return exactly the structured result the track-task skill ' +
+		'do not improvise. You also carry the unity-player-input skill: after composing an ' +
+		'input-triggered augment, author C# that joins a player and drives the triggering ' +
+		'button/stick to prove the whole chain fires end-to-end, then verify the effect. ' +
+		'Return exactly the structured result the track-task skill ' +
 		'defines, with an undo journal that reverses every change.',
-}));
+	}));
+}
 
-trackExperts['__d1__'] = d1Expert;
+trackExperts['__d1__'] = buildD1();
+
+// Resolve the expert for a request, honoring an optional per-request model
+// override (any provider/model the runtime supports). With no override the
+// caller should use the prebuilt registry; this rebuilds the expert on the
+// chosen model. Returns undefined for an unknown specific track.
+// A general conversational agent for the in-Editor chat surface (the Unity Assistant window on the vex flue
+// backend). Unlike the track specialists, it ANSWERS questions directly and only authors C# (via unity-cli) when
+// asked — it never "gives up" on a plain question. Carries the operating + behavioural skills plus the chat skill.
+export function buildChatAgent(model: string = DEFAULT_MODEL) {
+	return createAgent(() => ({
+		model,
+		// Beyond the operating + chat skills, the chat agent carries two KNOWLEDGE skills so it is actually competent
+		// about THIS project, not just a generic Unity bot: unity-stage-foundations (the DOTS Timeline stage — how the
+		// director/actor/target/physics-body live inside a SubScene, and how to query them, which is exactly why naive
+		// answers like "how many directors → 0" happen without it) and unity-augment-architecture (the whole-mechanic
+		// composition model: Input→Event→Reaction→Action→ObjectDefinition→TRA→EntityLink→Essence). Skill bodies load
+		// only on activation, so they cost ~nothing until a question needs them.
+		skills: [unityCli, agentProtocol, stageFoundations, augmentArchitecture, chat],
+		instructions:
+			'You are Vex, a helpful Unity assistant chatting with a developer inside the Unity Editor. ' +
+			'Answer their questions and requests conversationally and concisely. You can author and run C# via ' +
+			'unity-cli when they ask you to inspect or change the project, following the unity-agent-protocol ' +
+			'(discover before assuming; never claim what you did not verify). You also carry two knowledge skills for ' +
+			'THIS project — activate them when relevant: unity-stage-foundations (the DOTS Timeline stage lives inside ' +
+			'a SubScene, so to count/inspect directors, actors, targets or physics bodies you must query the SubScene ' +
+			'entities, not just the open scene) and unity-augment-architecture (how Input→Event→Reaction→Action→' +
+			'ObjectDefinition→TRA→EntityLink→Essence compose). For DEEP single-track authoring (building/verifying a ' +
+			'specific timeline track with full undo), tell the developer it is best run via `assistant_run` with the ' +
+			'matching track specialist, then help as far as you safely can. Apply the chat skill and return exactly the ' +
+			'structured result it defines. Never give up on a plain question.',
+	}));
+}
+
+export function expertFor(track: string, model?: string, masteryNames: string[] = []) {
+	const m = (model && model.trim()) || DEFAULT_MODEL;
+	if (track === '__boss__') return buildBoss(masteryNames, m);
+	if (track === '__d1__') return buildD1(m);
+	const skill = masteryByName[track];
+	if (!skill) return undefined;
+	return trackExpert(track, skill, m);
+}
 
 export default trackExperts;
