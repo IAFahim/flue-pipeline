@@ -9,26 +9,29 @@ description: Master of EntityLinkCopyTransformTrack + EntityLinkCopyTransformCli
 
 You are the specialist for **`EntityLinkCopyTransformTrack`** and **`EntityLinkCopyTransformClip`**
 from the EntityLinks package (`BovineLabs.Timeline.EntityLinks`, namespace
-`BovineLabs.Timeline.EntityLinks.Authoring`). Scope: exactly this track family — making one
-entity follow/attach to a schema-link-resolved source entity via a per-frame world-pose copy
-while a clip is active. **This skill also carries the EntityLinks FAMILY reference material**
-(the verified `Target` enum, the three-step resolver, the loud-bake/silent-runtime rule) — the
-Mutate, Parent and TargetPatch skills cross-reference these sections rather than restating
-them. Stage construction belongs to `unity-stage-foundations`; the other three EntityLinks
-tracks to their own skills. Behave per unity-agent-protocol; operate the editor per unity-cli.
+`BovineLabs.Timeline.EntityLinks.Authoring`): making one entity follow/attach to a
+schema-link-resolved source entity via a per-frame world-pose copy while a clip is active.
+**This skill also carries the EntityLinks FAMILY reference material** (the verified `Target`
+enum, the three-step resolver, the loud-bake/silent-runtime rule) — the Mutate, Parent and
+TargetPatch skills cross-reference these sections rather than restating them. Stage construction
+belongs to `unity-stage-foundations`; the other three EntityLinks tracks to their own skills.
 
-## 2. PORTABLE SEMANTICS
+**Operate per `unity-timeline-track-authoring`; behave per `unity-agent-protocol`; use the
+editor per `unity-cli`.** That shared skill owns the discovery preamble (§1), the SubScene
+create-and-wire bracket (§2), the undo-appendix structure (§3), and the fresh-load verification
+protocol (§4); cited inline below. This skill keeps ONLY what is unique to this track family.
+In the proving project the package source lives under `Packages/` (NOT PackageCache, unlike
+timeline core) — locate it by query, not by habit.
 
-True in ANY project containing the EntityLinks package. Provenance tags say where a fact was
-PROVEN, not where it applies. (All verified vex-ee 2026-06 via reflection dumps, package-source
-quotes through `File.ReadAllText` inside `unity-cli exec`, raw YAML reads, fresh-load
-read-backs. No play mode: runtime claims are source-derived; the overlap verdict is honestly
-INCONCLUSIVE.) In the proving project the package source lives under `Packages/` (NOT
-PackageCache, unlike timeline core) — locate it by query, not by habit.
+## 2. TYPE FACTS
+
+All verified vex-ee 2026-06 via reflection dumps, package-source quotes through
+`File.ReadAllText` inside `unity-cli exec`, raw YAML reads, fresh-load read-backs. No play mode:
+runtime claims are source-derived; the overlap verdict is honestly INCONCLUSIVE.
 
 | Type | Base | Facts |
 |---|---|---|
-| `EntityLinkCopyTransformTrack` | `DOTSTrack` | sealed, `[TrackBindingType(typeof(TargetsAuthoring))]` (`BovineLabs.Reaction.Authoring.Core.TargetsAuthoring`), `[TrackColor(0.85,0.2,0.4)]`, `[TrackClipType(EntityLinkCopyTransformClip)]`, `[DisplayName("BovineLabs/Entity Links/Copy Transform")]`, no Bake override. |
+| `EntityLinkCopyTransformTrack` | `DOTSTrack` | sealed, `[TrackBindingType(typeof(TargetsAuthoring))]` (`BovineLabs.Reaction.Authoring.Core.TargetsAuthoring` — the bind target), `[TrackColor(0.85,0.2,0.4)]`, `[TrackClipType(EntityLinkCopyTransformClip)]`, `[DisplayName("BovineLabs/Entity Links/Copy Transform")]`, no Bake override. |
 | `EntityLinkCopyTransformClip` | `DOTSClip` | `ClipCaps.None` (no blend/ease), `duration => 1` (seed only — freely resizable after `CreateClip`). |
 
 ### Clip fields (reflection + fresh-instance defaults)
@@ -55,8 +58,8 @@ Custom=6); member order differs from older docs. `(int)` casts on boxed values t
 `System.Convert.ToInt64`. `Targets.Get` semantics (source-quoted): `None → Entity.Null;
 Target/Owner/Source/Custom → that slot; Self → self`. `Targets` is `IComponentData { Entity
 Owner, Source, Target, Custom }`, baked from `TargetsAuthoring`; `Self` = the entity carrying
-the `Targets` (for timeline clips: the **track-binding entity**); `None` and unset slots
-resolve to `Entity.Null`.
+the `Targets` (for timeline clips: the **track-binding entity**); `None` and unset slots resolve
+to `Entity.Null`.
 
 ### FAMILY REFERENCE 2 — the resolver walkthrough
 
@@ -71,7 +74,7 @@ carries `EntityLinkSource` (struct `{ Entity Root; }`) with non-null Root, hop t
 **Step 2 — buffer search** (`TryResolveFromRoot`): linear search of the root's `EntityLinkEntry`
 buffer (`{ ushort Key; Entity Target; }`, baked by `EntityLinkRootAuthoring`'s baker) for
 `Key == LinkKey`. Guards: null root, **key 0**, missing buffer, key absent — all return false
-**silently**. (Concrete walkthrough on the worked-example stage in §5.)
+**silently**. (Concrete walkthrough on the worked-example stage in §6.)
 
 ### FAMILY REFERENCE 3 — the loud-bake/silent-runtime rule
 
@@ -104,6 +107,13 @@ current value. The write goes through the BeginSimulation ECB — one frame late
 replace, no blending. Per-frame only: nothing persists after the clip deactivates, and nothing
 ever touches editor/authoring state.
 
+### Silence profile
+
+Bake is loud on a null schema (LogError, component never added) and on the one silent bake path
+(id-0 pre-import schema bakes with key 0 but never resolves). EVERYTHING at runtime is silent:
+every resolution failure is a per-frame skip with no log. A clean console is therefore not
+evidence — verify the YAML and the fresh-load read-back per unity-timeline-track-authoring §4.
+
 ### PACKAGE BUG — THE UNASSIGNED ECB (triage rule; portable truth about this package version)
 
 In the shipped `EntityLinkCopyTransformSystem.OnUpdate`, the command buffer is created but
@@ -124,8 +134,8 @@ checks this line in `OnUpdate` FIRST**, before suspecting their own wiring.
   no `EntityLinkEntry` buffer there → `Entity.Null` → silent per-frame skip, no log.
 - **DON'T trust the default `readRootFrom = Owner`** — on a binding whose `Targets.Owner` is
   unset, Owner → `Entity.Null` → the clip silently never resolves (proven on the vex-ee stage,
-  §5). **Use `Self` when the bound entity itself carries the EntityLinkSource**; derive from the
-  discovered slot layout (§3.4), never from the default.
+  §6). **Use `Self` when the bound entity itself carries the EntityLinkSource**; derive from the
+  discovered slot layout, never from the default.
 - **DO read offsets in SOURCE space** — (0,3,0) is "3 units along the SOURCE's local up"; a
   source pitched 90° puts the follower at +3 world X, not above; the offset rides the source's
   orientation every frame.
@@ -137,246 +147,103 @@ checks this line in `OnUpdate` FIRST**, before suspecting their own wiring.
   tracks, same mover) each `ECB.SetComponent` the whole `LocalTransform`; playback order is
   `sortKey = [EntityIndexInQuery]` (chunk order) — last-writer-wins by entity-in-query order,
   NOT clip start time, and moot until the ECB bug is fixed.
-- **DON'T create schema assets — a missing prerequisite (protocol §6)** — discover existing ones by type
-  (§3.4); report a missing/id-0 schema as a missing prerequisite.
+- **DON'T create schema assets — a missing prerequisite (protocol §6)** — discover existing ones
+  by type; report a missing/id-0 schema as a missing prerequisite.
 
-## 3. DISCOVERY RECIPES
+## 3. DISCOVERY
 
-Act only through `unity-cli exec` / `unity-cli console`; never the filesystem; never play mode;
-unity-cli Safe Loop on every mutation. Names below are parameters — discover them in THIS
-project; never assume the worked example (§5).
+Run the discovery preamble per **unity-timeline-track-authoring §1** (D1 package check, D2 scene
++ SubScene, D3 director selection, D4 bind-target by component, D5 `PRE|` capture). Track-specific
+deltas to its generic steps:
 
-**3.1 Confirm the package exists (else report a missing prerequisite — protocol §6):**
-```csharp
-var t = System.Type.GetType("BovineLabs.Timeline.EntityLinks.Authoring.EntityLinkCopyTransformTrack, BovineLabs.Timeline.EntityLinks.Authoring");
-var b = System.Type.GetType("BovineLabs.Reaction.Authoring.Core.TargetsAuthoring, BovineLabs.Reaction.Authoring");
-return t == null || b == null
-    ? "MISSING_PREREQUISITE|EntityLinks track or TargetsAuthoring binding type absent in this project"
-    : "OK|" + t.AssemblyQualifiedName + "|dataPath=" + UnityEngine.Application.dataPath;
-```
+- **D1 package check** confirms BOTH the track type
+  (`BovineLabs.Timeline.EntityLinks.Authoring.EntityLinkCopyTransformTrack,
+  BovineLabs.Timeline.EntityLinks.Authoring`) AND the bind type
+  (`BovineLabs.Reaction.Authoring.Core.TargetsAuthoring, BovineLabs.Reaction.Authoring`); either
+  absent → MISSING_PREREQUISITE.
+- **D4 bind target is the `TargetsAuthoring` COMPONENT** (never the Transform). Print each
+  holder's hierarchy path AND its slot values (Owner/Source/Target/Custom).
+- **Link-wiring discovery (this track's extra prerequisite):** find `EntityLinkSourceAuthoring`
+  and `EntityLinkRootAuthoring` holders; print each source's Root + Schemas and each root's
+  children/key set. Schema assets by TYPE with a live id dump (ids DRIFT; never trust remembered):
+  `AssetDatabase.FindAssets("t:EntityLinkSchema")` → per asset print `SCHEMA|<path>|guid=<g>|id=<n>`,
+  reading the `Id` property (or `id` field) via `System.Convert.ToInt64` (byte/ushort-backed).
+  id==0 ⇒ unusable (silent never-resolve). A usable schema must already exist with a non-zero
+  imported id AND its key present in the intended root's source set. **NEVER create schema
+  assets** — out of domain.
+- **Derive `readRootFrom` from the discovered layout:** `Self` if the bound object itself carries
+  the EntityLinkSource; otherwise the Targets slot whose entity carries it — confirm the slot is
+  actually SET. Never accept the default `Owner` blindly (the trap above).
 
-**3.2 Find the active scene + SubScene(s):** run the unity-cli skill's First Command (scene
-path, roots, SubScenes → their `.unity` paths); record `parentScenePath` + `subScenePath`(s).
+## 4. CANONICAL RECIPES (the bracket's track-specific middle)
 
-**3.3 Find PlayableDirector(s) inside the SubScene** (read-only additive open, restore parent
-after) via `FindObjectsByType<UnityEngine.Playables.PlayableDirector>(FindObjectsInactive.Include,
-FindObjectsSortMode.None)`; print per director the hierarchy path, `scene.path`, `playableAsset`
-(path or null), sibling components. STATE your selection rule in the memory card (e.g. "the only
-director in the active SubScene"); zero directors → protocol §6.
+Use the SubScene create-and-wire bracket from **unity-timeline-track-authoring §2** verbatim:
+track type `BovineLabs.Timeline.EntityLinks.Authoring.EntityLinkCopyTransformTrack`, bind
+component `BovineLabs.Reaction.Authoring.Core.TargetsAuthoring`. Load the discovered schema with
+`AssetDatabase.LoadAssetAtPath<BovineLabs.Timeline.EntityLinks.Authoring.EntityLinkSchema>(schemaPath)`.
+Replace the bracket's clip middle with one of these patterns (designer intent → wiring). Clip
+starts/durations/offsets are example choices, not package constants. If direct field assignment
+fails to compile in the sandbox, set every field via `SerializedObject` using the camelCase YAML
+names.
 
-**3.4 Discover the cast and the link wiring** (read-only, same SubScene bracket):
-- Binding candidates: `FindObjectsByType<BovineLabs.Reaction.Authoring.Core.TargetsAuthoring>`
-  — print each holder's hierarchy path AND its slot values (Owner/Source/Target/Custom). The
-  track binds the **TargetsAuthoring COMPONENT**, never the Transform.
-- Link wiring: find `EntityLinkSourceAuthoring` and `EntityLinkRootAuthoring` holders; print
-  each source's Root + Schemas and each root's children/key set.
-- Schema assets by TYPE with a live id dump — ids drift; never trust remembered values:
-  `AssetDatabase.FindAssets("t:EntityLinkSchema")` → per asset print
-  `SCHEMA|<path>|guid=<g>|id=<n>`, reading the id by reflecting the `Id` property (or `id`
-  field) and converting via `System.Convert.ToInt64` (byte/ushort-backed). id==0 ⇒ unusable
-  (silent never-resolve). **NEVER create schema assets** — out of domain (a missing prerequisite); a usable
-  schema must already exist with a non-zero imported id AND its key present in the intended
-  root's source set.
-- Derive `readRootFrom` from the discovered layout: `Self` if the bound object itself carries
-  the EntityLinkSource; otherwise the Targets slot whose entity carries it — confirm the slot
-  is actually SET.
+**HOVER-FOLLOW** — "make this hover above / track that linked thing, position only":
+`entityToMove = Target.Target` (the binding's Target slot moves); `readRootFrom = <DERIVED>`
+(e.g. `Target.Self` when the bound object carries the EntityLinkSource — default `Owner` is the
+trap); `link = schema`; `copyPosition = true`, `copyRotation = false`;
+`positionOffset = new Vector3(0,3,0)` (in SOURCE space — "3 along the source's local up").
 
-**3.5 Capture the chosen director's existing state — this is pre-state (`PRE|`)**:
-```csharp
-// PRE|playableAsset=<asset PATH or null>   via AssetDatabase.GetAssetPath(director.playableAsset)
-// PRE|binding|<i>|<track name>|<track type>|<bound object hierarchy path + component type, or null>
-//   one line per GetOutputTracks() of the CURRENT asset, via director.GetGenericBinding(track).
-// Capture the asset PATH and each track's NAME/index even when the table looks empty — they make
-// the undo journal replayable (UNDO-1 reloads the old asset by path, re-binds by name/index).
-// Binding tables are keyed by track asset and SURVIVE playableAsset swaps — capture the WHOLE table.
-```
-Record these in the undo journal (§6) before any mutation.
+**FULL-SNAP** — "stick this fully onto that linked thing, pose and facing":
+same fields with `copyPosition = copyRotation = true` and
+`rotationOffset = <CHOSEN Euler degrees>` (e.g. `(0,90,0)`; YAML keeps the Euler verbatim, the
+quaternion is bake-time only).
 
-**Name resolution rule**: `GameObject.Find` misses inactive objects and is ambiguous on
-duplicate names. Discovery must confirm the chosen name is active and unique in the SubScene;
-otherwise resolve by walking the SubScene's roots to the recorded hierarchy path (or
-`FindObjectsByType` filtered by `scene`) instead of `Find`.
+## 5. CROSS-REFERENCES
 
-## 4. CANONICAL RECIPES
+Sibling EntityLinks track skills (`unity-track-entitylink-mutate`, `-parent`, `-targetpatch`)
+cite FAMILY REFERENCE 1–3 here rather than restating them. Stage construction →
+`unity-stage-foundations`. Schema/link concepts → `unity-targets`, `unity-gameplay-config`.
 
-One logical change per exec block; each block prints its `PRE|` capture before mutating
-(protocol §2), saves inside the block, and is verified from a fresh load (§7).
+## 6. WORKED EXAMPLE (vex-ee training stage) — example environment; rediscover, never assume
 
-**4.1 Create timeline + track + clips, then wire the director:**
-
-```csharp
-// ---- parameters (discovered in §3 / chosen with designer) ----
-var parentScenePath = "<DISCOVERED>"; var subScenePath = "<DISCOVERED>";    // §3.2
-var directorGoName  = "<DISCOVERED>";                                        // §3.3
-var bindTargetPath  = "<DISCOVERED>"; // §3.4 — object whose TargetsAuthoring describes the cast
-var schemaPath      = "<DISCOVERED>"; // §3.4 — existing schema, id != 0, key in the root's buffer
-var assetFolder = "<CHOSEN>"; var assetPath = assetFolder + "/<Name>.playable"; var trackName = "<CHOSEN>";
-var parentScene = UnityEditor.SceneManagement.EditorSceneManager.GetActiveScene();
-var subScene = UnityEditor.SceneManagement.EditorSceneManager.OpenScene(
-    subScenePath, UnityEditor.SceneManagement.OpenSceneMode.Additive);
-UnityEditor.SceneManagement.EditorSceneManager.SetActiveScene(subScene);
-try {
-    // CAPTURE (print + journal): PRE|folderExisted=<bool> PRE|assetExisted=<bool>
-    var folderExisted = UnityEditor.AssetDatabase.IsValidFolder(assetFolder);
-    if (!folderExisted) { /* CreateFolder for each missing segment */ }
-
-    var timeline = UnityEngine.ScriptableObject.CreateInstance<UnityEngine.Timeline.TimelineAsset>();
-    UnityEditor.AssetDatabase.CreateAsset(timeline, assetPath);
-    var track = timeline.CreateTrack<BovineLabs.Timeline.EntityLinks.Authoring.EntityLinkCopyTransformTrack>(null, trackName);
-    var schema = UnityEditor.AssetDatabase.LoadAssetAtPath<BovineLabs.Timeline.EntityLinks.Authoring.EntityLinkSchema>(schemaPath);
-
-    // Pattern HOVER-FOLLOW: position only, offset in SOURCE-local frame
-    var clipA = track.CreateClip<BovineLabs.Timeline.EntityLinks.Authoring.EntityLinkCopyTransformClip>();
-    clipA.start = 0; clipA.duration = 4; clipA.displayName = "<clipName>";
-    var a = (BovineLabs.Timeline.EntityLinks.Authoring.EntityLinkCopyTransformClip)clipA.asset;
-    a.entityToMove = BovineLabs.Reaction.Data.Core.Target.Target;  // WHO moves: the binding's Target slot
-    a.readRootFrom = BovineLabs.Reaction.Data.Core.Target.Self;    // <DERIVED §3.4> — default Owner is a trap
-    a.link = schema; a.copyPosition = true; a.copyRotation = false;
-    a.positionOffset = new UnityEngine.Vector3(0f, 3f, 0f);         // <CHOSEN> in SOURCE space
-    // Pattern FULL-SNAP: same fields with copyPosition = copyRotation = true and
-    // rotationOffset = <CHOSEN Euler degrees> (YAML keeps the Euler verbatim).
-
-    foreach (var o in new UnityEngine.Object[] { timeline, track, a }) UnityEditor.EditorUtility.SetDirty(o);
-    UnityEditor.AssetDatabase.SaveAssets();
-
-    // Wire the director (binding table lives in the SCENE file -> persists fine)
-    var director = UnityEngine.GameObject.Find(directorGoName).GetComponent<UnityEngine.Playables.PlayableDirector>();
-    // CAPTURE (print + journal) BEFORE mutating: PRE|playableAsset=... PRE|binding|... (§3.5)
-    var bindTarget = UnityEngine.GameObject.Find(bindTargetPath)
-        .GetComponent<BovineLabs.Reaction.Authoring.Core.TargetsAuthoring>(); // the COMPONENT, not the Transform
-    director.playableAsset = timeline;
-    director.SetGenericBinding(track, bindTarget);
-    UnityEditor.EditorUtility.SetDirty(director);
-    UnityEditor.SceneManagement.EditorSceneManager.SaveScene(subScene);
-    return "OK|" + assetPath;
-} finally {
-    UnityEditor.SceneManagement.EditorSceneManager.SetActiveScene(parentScene);
-    UnityEditor.SceneManagement.EditorSceneManager.CloseScene(subScene, false);
-    UnityEditor.SceneManagement.EditorSceneManager.OpenScene(parentScenePath, UnityEditor.SceneManagement.OpenSceneMode.Single);
-}
-```
-
-Clip starts/durations/offsets are example choices, not package constants. `EXPECTED:` the
-training report preserved field VALUES and YAML, not the authoring exec code — if direct field
-assignment fails to compile, set via `SerializedObject` using the YAML field names in §7.
-Verify per §7 in SEPARATE blocks before claiming success.
-
-## 5. WORKED EXAMPLE (vex-ee training stage) — example environment; rediscover, never assume
-
-- Project `/home/i/GitHub/vex-ee` (`dataPath=/home/i/GitHub/vex-ee/Assets`); parent scene
-  `Assets/Scenes/Main Scene.unity`; SubScene `Assets/Scenes/Main Sub Scene.unity`; package at
-  `/home/i/GitHub/vex-ee/Packages/BovineLabs.Timeline.EntityLinks/`.
-- Stage (unity-stage-foundations): `Stage_Director` (PlayableDirector +
-  TimelineReferenceAuthoring, the only director); `Stage_Actor` (capsule — TargetsAuthoring
-  Target=Stage_Target, Owner/Source/Custom unset; EntityLinkSource Root=Stage_LinkRoot,
-  Schemas=[Schema_Actor]); `Stage_LinkRoot` bakes `{Key=10, Target=Stage_Actor}`; `Stage_Target`
-  (cube) is a root object (direct world-write path). Schema
-  `Assets/Training/00-foundations/Schema_Actor.asset`: imported `id: 10`,
-  guid `3b375c42affc2917f956d01310d31894`.
-- Asset built: `Assets/Training/07-entitylink-copytransform-track/CopyTransformMastery.playable`
-  — track `CopyTransformTrack`; clip A_HoverFollow 0–4s (entityToMove=Target, readRootFrom=Self,
-  link=Schema_Actor, copyPos=True copyRot=False, posOff=(0,3,0)); clip B_FullSnap 4–6s (copy
-  both, rotOff=(0,90,0) Euler verbatim in YAML). Clip A YAML: `entityToMove: 1`,
-  `readRootFrom: 4`, `link: {fileID: 11400000, guid: 3b375c42affc2917f956d01310d31894, type: 2}`.
+Delta vs the shared stage in unity-timeline-track-authoring §5:
+- Package at `/home/i/GitHub/vex-ee/Packages/BovineLabs.Timeline.EntityLinks/` (under `Packages/`,
+  not PackageCache). `Stage_Actor` carries `TargetsAuthoring` (Target=Stage_Target,
+  Owner/Source/Custom unset) AND `EntityLinkSource` (Root=Stage_LinkRoot, Schemas=[Schema_Actor]);
+  `Stage_LinkRoot` bakes `{Key=10, Target=Stage_Actor}`; `Stage_Target` (cube) is a root object
+  (direct world-write path). Schema `Assets/Training/00-foundations/Schema_Actor.asset`: imported
+  `id: 10`, guid `3b375c42affc2917f956d01310d31894`.
+- Asset built: `Assets/Training/07-entitylink-copytransform-track/CopyTransformMastery.playable`,
+  track `CopyTransformTrack` bound to `Stage_Actor`'s `TargetsAuthoring`. Clip A_HoverFollow 0–4s
+  (entityToMove=Target, readRootFrom=Self, link=Schema_Actor, copyPos=True copyRot=False,
+  posOff=(0,3,0)); clip B_FullSnap 4–6s (copy both, rotOff=(0,90,0) Euler verbatim in YAML). Clip A
+  YAML: `entityToMove: 1`, `readRootFrom: 4`,
+  `link: {fileID: 11400000, guid: 3b375c42affc2917f956d01310d31894, type: 2}`.
 - Resolver walkthrough (clip A): binding=Stage_Actor → `Self` → Stage_Actor → Root=Stage_LinkRoot
-  → buffer key 10 → SOURCE=Stage_Actor; `entityToMove=Target` → Stage_Target — the cube copies
-  the capsule's world position + (0,3,0) in the capsule's local frame, every active frame.
-  Training deviation: clip B's unspecified `readRootFrom` set to `Self` — the default `Owner` is
-  unset on Stage_Actor, a guaranteed silent skip.
-- Wiring after the lesson: director RESTORED to
-  `Assets/Training/01-transform-position-track/PositionMastery.playable`; binding table 5
-  entries, all → Stage_Actor (Position/Scale/Rotation Transform, TimeScale StatAuthoring,
-  CopyTransformTrack TargetsAuthoring — left as permanent additive stage state). Known
-  pre-existing vex-ee console entries: UnityCliConnector HTTP server start, PerformanceTesting
-  IPrebuildSetup/IPostBuildCleanup, TestResults.xml save.
+  → buffer key 10 → SOURCE=Stage_Actor; `entityToMove=Target` → Stage_Target — the cube copies the
+  capsule's world position + (0,3,0) in the capsule's local frame, every active frame. Training
+  deviation: clip B's unspecified `readRootFrom` set to `Self` (default `Owner` is unset on
+  Stage_Actor → guaranteed silent skip).
+- After the lesson the director was RESTORED to
+  `Assets/Training/01-transform-position-track/PositionMastery.playable`; binding table 5 entries
+  all → Stage_Actor (the CopyTransformTrack→TargetsAuthoring entry left as permanent additive
+  stage state).
 
-## 6. UNDO APPENDIX
+## 7. UNDO & VERIFICATION
 
-Artifact inventory for one run of §4 (vex-ee instance shown in §5):
-1. Created asset `<assetPath>` (.playable: TimelineAsset + track + clip sub-assets —
-   `DeleteAsset` removes all sub-assets with the file).
-2. Possibly-created folder(s) `<assetFolder>` (only if `PRE|folderExisted=false`).
-3. Mutated `director.playableAsset` (vex-ee pre value: PositionMastery, restored in-run;
-   capture YOURS per §3.5).
-4. Added generic-binding entry for the new track (SubScene file; keyed by track asset, SURVIVES
-   restoring `playableAsset` — vex-ee left it as permanent stage state; full undo must
-   `ClearGenericBinding` it). `EXPECTED:` the report proves the POST table (5 entries) and the
-   prior asset's restore but never printed the pre-wiring table as `PRE|` lines — derivably the
-   4 non-CopyTransform entries; capture your own table verbatim per §3.5.
-5. If the loud-bake demo was reproduced: the temp null-link clip (training removed it,
-   `YAML_HAS_TMP|False`) and its deliberate console LogError — console history is not undoable;
-   record it in the card instead.
-6. RUNTIME effects: **none exist in the editor.** The per-frame LocalTransform copy happens only
-   in play mode (and is expected to throw under the unassigned-ECB bug, §2); nothing persists
-   after the clip or into authoring data — nothing runtime-side to undo.
+Undo per **unity-timeline-track-authoring §3** and verify per **§4** — both standard for this
+family, with these track-specific notes:
 
-ORDER: restore the director FIRST, THEN delete the asset, THEN other captured scene values —
-deleting the asset while the director still points at it would leave a dangling `{fileID: 0}`-
-style reference in the scene file instead of the captured pre-state.
-
-Journal entry templates (protocol §5 — fill from YOUR captures, reverse order):
-
-```csharp
-// UNDO-1: restore director's captured playableAsset + binding table (SubScene bracket)
-var parentScenePath = "<CAPTURED>"; var subScenePath = "<CAPTURED>";
-var directorGoName = "<CAPTURED>"; var assetPath = "<CAPTURED>";
-var parentScene = UnityEditor.SceneManagement.EditorSceneManager.GetActiveScene();
-var subScene = UnityEditor.SceneManagement.EditorSceneManager.OpenScene(
-    subScenePath, UnityEditor.SceneManagement.OpenSceneMode.Additive);
-UnityEditor.SceneManagement.EditorSceneManager.SetActiveScene(subScene);
-try {
-    var director = UnityEngine.GameObject.Find(directorGoName).GetComponent<UnityEngine.Playables.PlayableDirector>();
-    var myAsset = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.Timeline.TimelineAsset>(assetPath);
-    foreach (var tr in myAsset.GetOutputTracks())
-        director.ClearGenericBinding(tr);            // entries I added for MY tracks
-    // Restore each CAPTURED binding (PRE|binding| lines): reload the PREVIOUS asset by captured
-    // path, match tracks by name/index, re-find bound objects by captured hierarchy path, and
-    // re-bind the captured COMPONENT type (bind what was captured, not what seems right).
-    director.playableAsset =                         // restore CAPTURED value, never "default"
-        UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.Playables.PlayableAsset>("<CAPTURED pre path>") /* or null */;
-    UnityEditor.EditorUtility.SetDirty(director);
-    UnityEditor.SceneManagement.EditorSceneManager.SaveScene(subScene);
-    return "UNDONE|director restored";
-} finally {
-    UnityEditor.SceneManagement.EditorSceneManager.SetActiveScene(parentScene);
-    UnityEditor.SceneManagement.EditorSceneManager.CloseScene(subScene, false);
-    UnityEditor.SceneManagement.EditorSceneManager.OpenScene(parentScenePath, UnityEditor.SceneManagement.OpenSceneMode.Single);
-}
-```
-
-```csharp
-// UNDO-2: delete the created .playable (+ folder, only if PRE|folderExisted=false and now empty)
-var assetPath = "<CAPTURED>"; var assetFolder = "<CAPTURED>"; var folderExisted = false; // <CAPTURED>
-var ok = UnityEditor.AssetDatabase.DeleteAsset(assetPath);
-if (!folderExisted && UnityEditor.AssetDatabase.FindAssets("", new[]{ assetFolder }).Length == 0)
-    UnityEditor.AssetDatabase.DeleteAsset(assetFolder);
-return "UNDONE|deleted=" + ok + "|" + assetPath;
-```
-
-```csharp
-// UNDO-3: restore any other captured scene values — normally none beyond UNDO-1 for this track
-// family (it never moves editor objects; schemas untouched). Only entries YOUR journal recorded.
-```
-
-UNDO-4 (verification, fresh load — protocol §7): reload the SubScene additively; print
-`director.playableAsset` (= CAPTURED pre value) and the binding table (= captured `PRE|binding|`
-lines); confirm `AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(assetPath) == null`; restore
-the parent scene; `unity-cli console --filter error` clean against the project baseline (§5).
-
-## 7. VERIFICATION PROTOCOL
-
-1. **Fresh-load asset dump**: in a new exec block, `AssetDatabase.LoadAssetAtPath` the
-   `.playable`; dump track + clips (name, start/end, entityToMove, readRootFrom, link asset +
-   imported id, copy mask, offsets). In-memory state after a save is not evidence.
-2. **Raw YAML check**: `link:` is `{fileID: 11400000, guid: <schema guid>, type: 2}` (never
-   `{fileID: 0}`); enum bytes match intent (e.g. `entityToMove: 1`, `readRootFrom: 4`); authored
-   Euler verbatim (`rotationOffset:` keeps degrees).
-3. **Schema check**: the schema asset's fresh YAML `id:` must be non-zero (vex-ee: 10).
-4. **Binding table from a RELOADED SubScene**: expect
-   `BINDING|<trackName>|bound=<bindTarget> (TargetsAuthoring)` — the COMPONENT, not the
-   Transform — and all captured prior bindings intact. Never leave experimental bindings.
-5. **Parent-scene restore**: end with `sceneCount=1`,
-   `scene[0]=<parentScenePath>|loaded=True|active=True|dirty=False`.
-6. **Console**: `unity-cli console --filter error` shows nothing new beyond the project baseline
-   (vex-ee baseline in §5), except any DELIBERATE "missing link schema" demo — temp clip
-   removed, clean rebake proven.
+- **Undo runtime note:** the per-frame `LocalTransform` copy happens only in play mode (and is
+  expected to throw under the unassigned-ECB bug, §2); nothing persists after the clip or into
+  authoring data — **nothing runtime-side to undo**. The journal reverses only the authoring
+  artifacts (asset, folder, `director.playableAsset`, the added generic-binding entry).
+- **Loud-bake demo extra (if reproduced):** the temp null-link clip and its deliberate console
+  LogError — console history is not undoable; record it in the card instead.
+- **Verification field list (§4 step 1):** dump track + clips with name, start/end, `entityToMove`,
+  `readRootFrom`, link asset + imported id, copy mask, offsets.
+- **Verification YAML check (§4 step 2):** `link:` is `{fileID: 11400000, guid: <schema guid>,
+  type: 2}` (never `{fileID: 0}`); enum bytes match intent (`entityToMove: 1`, `readRootFrom: 4`);
+  authored Euler verbatim (`rotationOffset:` keeps degrees). Plus a schema check: the schema
+  asset's fresh YAML `id:` must be non-zero (vex-ee: 10).
+- **Binding expectation (§4 step 4):** `BINDING|<trackName>|bound=<bindTarget> (TargetsAuthoring)`
+  — the COMPONENT, not the Transform — all captured prior bindings intact.

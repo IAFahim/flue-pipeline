@@ -1,6 +1,6 @@
 ---
 name: unity-track-entitylink-targetpatch
-description: Master of EntityLinkTargetPatchTrack + EntityLinkTargetPatchClip (EntityLinks package, BovineLabs.Timeline.EntityLinks) — one-shot permanent re-pointing of a Targets slot via links, the skip-on-Null safety, the weakest-undo-in-family truth, the assigned-but-unused ECB; carries the EntityLinks FAMILY CLOSING SUMMARY. Portable to any project containing the package; worked example from vex-ee. Use when a designer asks "from now on, act on the linked thing instead".
+description: Master of EntityLinkTargetPatchTrack + EntityLinkTargetPatchClip (EntityLinks package, BovineLabs.Timeline.EntityLinks) — one-shot permanent re-pointing of a Targets slot via links, the skip-on-Null safety, the weakest-undo-in-family truth, the assigned-but-unused ECB; carries the EntityLinks FAMILY CLOSING SUMMARY. Portable to any project containing the package; worked example from vex-ee.
 ---
 
 # EntityLinkTargetPatchTrack specialist
@@ -13,12 +13,18 @@ from the EntityLinks package (`BovineLabs.Timeline.EntityLinks`, namespace
 slot of the track-binding entity's `Targets` component (the cast list) once at clip activation,
 so everything that acts on that slot acts on the link-resolved entity from then on. This skill
 also carries the **FAMILY CLOSING SUMMARY** comparing all four EntityLinks tracks (end of §2).
+
 **Family fundamentals live in `unity-track-entitylink-copytransform`** (the verified `Target`
 enum: None=0, Target=1, Owner=2, Source=3, Self=4, Custom=6, no 5; the three-step
-`EntityLinkResolver` chain; the loud-bake/silent-runtime rule). Mutate semantics live in
-`unity-track-entitylink-mutate` (also the bake-error capture recipe), Parent's revert in
+`EntityLinkResolver` chain; the loud-bake/silent-runtime rule). Mutate semantics + the
+bake-error capture recipe live in `unity-track-entitylink-mutate`; Parent's revert in
 `unity-track-entitylink-parent`. Stage construction belongs to `unity-stage-foundations`.
-Behave per unity-agent-protocol; operate the editor per unity-cli.
+
+**Operate per `unity-timeline-track-authoring`; behave per `unity-agent-protocol`; use the
+editor per `unity-cli`.** That shared skill owns the discovery preamble (§1), the SubScene
+bracket (§2), the undo-appendix structure (§3), and the verification protocol (§4); this skill
+keeps ONLY the EntityLinkTargetPatch-unique facts below and cites those sections where ceremony
+applies.
 
 ## 2. PORTABLE SEMANTICS
 
@@ -39,9 +45,10 @@ must smuggle the old value through a spare Targets slot via deliberate-miss clip
 is fragile by construction. Mutate undoes with one clip and no preconditions; TargetPatch needs
 three clips, a sacrificial slot, and a guaranteed-miss key — and still loses if anyone touches
 the slot. (Scope honesty: this is about RUNTIME state inside a play session; nothing the system
-does ever writes back to authoring data — see §6.) The flip side is the family's only
-failure-safety knob: `Fallback`, where `None` means skip-don't-corrupt — a failed patch is a
-no-op, never a null-write.
+does ever writes back to authoring data — the agent's undo journal reverses authoring artifacts
+only, which fully reverses everything that persists in the editor.) The flip side is the
+family's only failure-safety knob: `Fallback`, where `None` means skip-don't-corrupt — a failed
+patch is a no-op, never a null-write.
 
 ### Verified type facts
 
@@ -51,12 +58,15 @@ no-op, never a null-write.
 | `EntityLinkTargetPatchClip` | `DOTSClip` | `ClipCaps.None`, `duration => 1` (seed only), implements `ITimelineClipAsset` |
 | System | `EntityLinkTargetPatchSystem` | `[UpdateInGroup(typeof(TimelineComponentAnimationGroup))]` + WorldSystemFilter ONLY — no ordering attributes of its own |
 
+The bind target (the `[TrackBindingType]`) is the **`TargetsAuthoring` COMPONENT**, never the
+Transform.
+
 ### Clip fields — **PascalCase, unlike the camelCase fields of the other three family clips** (fresh-instance defaults, reflection)
 
 | Field | Type | Default | Meaning |
 |---|---|---|---|
 | `Link` | `EntityLinkSchema` | null | ushort key; null → LOUD bake error, component skipped |
-| `ReadRootFrom` | `Target` | **`Source(3)`** | Link-map hunt start — TRAP on any binding with an unset Source slot (silent never-resolve); derive from §3.4, typically `Self(4)` |
+| `ReadRootFrom` | `Target` | **`Source(3)`** | Link-map hunt start — TRAP on any binding with an unset Source slot (silent never-resolve); derive from the discovered layout, typically `Self(4)` |
 | `WriteTo` | `Target` | `Target(1)` | WHICH `Targets` slot gets overwritten; `None`/`Self` → LOUD bake error |
 | `Fallback` | `Target` | `Target(1)` | Slot read when link resolution fails; NOT validated at bake (None legal and meaningful) |
 
@@ -123,8 +133,9 @@ not one-frame-latent like CopyTransform.
 - **DO produce ALL `.sceneWithBuildSettings` artifacts when forcing a bake** — the
   cached-artifact trap; a clean rebake is proven by a CHANGED artifact hash with zero new error
   lines, not by silence. (Recipe in `unity-track-entitylink-mutate` §3.6.)
-- **DON'T create schema assets — a missing prerequisite (protocol §6)** — discover existing ones by type
-  (§3.4); ids are import-assigned, id 0 never resolves.
+- **DON'T create schema assets — a missing prerequisite (protocol §6)** — discover existing ones
+  by type (per the shared §1 discovery, schema-prerequisite branch); ids are import-assigned,
+  id 0 never resolves.
 
 ### EntityLinks FAMILY CLOSING SUMMARY (lessons 07–10 — portable)
 
@@ -160,64 +171,32 @@ not one-frame-latent like CopyTransform.
 > ON — the first two touch transforms (self-limiting or restorable), the last
 > two touch the indirection tables (permanent until compensated).
 
-## 3. DISCOVERY RECIPES
+## 3. DISCOVERY DELTA
 
-Act only through `unity-cli exec` / `unity-cli console`; never the filesystem; never play mode;
-unity-cli Safe Loop on every mutation. Names below are parameters — discover them in THIS
-project; never assume the worked example (§5).
+Discovery is the shared `unity-timeline-track-authoring` §1 preamble (D1 package check, D2
+scene/SubScene, D3 director selection, D4 bind target + prerequisites, D5 `PRE|` capture). Run
+it with these EntityLinkTargetPatch substitutions:
 
-**3.1 Confirm the package exists (else report a missing prerequisite — protocol §6):**
-```csharp
-var t = System.Type.GetType("BovineLabs.Timeline.EntityLinks.Authoring.EntityLinkTargetPatchTrack, BovineLabs.Timeline.EntityLinks.Authoring");
-return t == null
-    ? "MISSING_PREREQUISITE|EntityLinkTargetPatchTrack not found - the EntityLinks package is absent in this project"
-    : "OK|" + t.AssemblyQualifiedName + "|dataPath=" + UnityEngine.Application.dataPath;
-```
+- **D1 type/assembly:** `BovineLabs.Timeline.EntityLinks.Authoring.EntityLinkTargetPatchTrack,
+  BovineLabs.Timeline.EntityLinks.Authoring`; missing →
+  `MISSING_PREREQUISITE|EntityLinkTargetPatchTrack not found - the EntityLinks package is absent`.
+- **D4 bind target = `TargetsAuthoring` (the COMPONENT).** Print each holder's path AND its slot
+  values (Owner/Source/Target/Custom): you must know which slots are SET (Fallback reads them),
+  which are FREE (parking slots for the compensator), and which slot the designer wants patched.
+- **D4 link wiring (track-specific prerequisite):** find `EntityLinkSourceAuthoring` /
+  `EntityLinkRootAuthoring` holders; print Roots, Schemas, and each root's authored key set — a
+  deliberate-miss clip needs a schema whose key is PROVABLY absent from the root's buffer; verify
+  absence by query, never by assumption. Discover schemas by TYPE
+  (`AssetDatabase.FindAssets("t:EntityLinkSchema")`) with live id dump (id==0 ⇒ unusable; cast to
+  `UnityEngine.Object` before `GetAssetPath`). **NEVER create schema assets** — out of domain.
+- **Derive `ReadRootFrom` from the layout** (`Self` when the bound object itself carries the
+  source — the default `Source` is a trap on any binding with an unset Source slot).
 
-**3.2 Find the active scene + SubScene(s):** unity-cli First Command; record `parentScenePath`
-and candidate `subScenePath`(s).
+## 4. CANONICAL CLIP PATTERNS
 
-**3.3 Find PlayableDirector(s) inside the SubScene** (read-only additive open, restore parent
-after) via `FindObjectsByType<PlayableDirector>(Include, None)`; print hierarchy path,
-`scene.path`, `playableAsset`, sibling components. STATE your selection rule; zero directors →
-protocol §6.
-
-**3.4 Discover the cast, link wiring and schemas** (read-only, same bracket):
-- Binding candidates: `FindObjectsByType<TargetsAuthoring>` — print each holder's path AND its
-  slot values (Owner/Source/Target/Custom): you must know which slots are SET (Fallback reads
-  them), which are FREE (parking slots for the compensator), and which slot the designer wants
-  patched. The track binds the **TargetsAuthoring COMPONENT**, never the Transform.
-- Link wiring: find `EntityLinkSourceAuthoring` / `EntityLinkRootAuthoring` holders; print
-  Roots, Schemas, and each root's authored key set — a deliberate-miss clip needs a schema
-  whose key is PROVABLY absent from the root's buffer; verify absence by query, never by
-  assumption.
-- Schemas by TYPE with live id dump: `AssetDatabase.FindAssets("t:EntityLinkSchema")` →
-  path/guid/imported id (id==0 ⇒ unusable; cast to `UnityEngine.Object` before `GetAssetPath`).
-  **NEVER create schema assets** — out of domain (a missing prerequisite).
-- Derive `ReadRootFrom` from the layout (`Self` when the bound object itself carries the source
-  — the default `Source` is a trap on any binding with an unset Source slot).
-
-**3.5 Capture the chosen director's existing state — this is pre-state (`PRE|`)**:
-```csharp
-// PRE|playableAsset=<asset PATH or null>
-// PRE|binding|<i>|<track name>|<track type>|<bound object hierarchy path + component type, or null>
-//   one line per GetOutputTracks() of the CURRENT asset. Capture the asset PATH and each track's
-//   NAME/index even when the table looks empty — they make the undo journal replayable (UNDO-1
-//   reloads the old asset by path, re-binds by name/index). Binding tables are keyed by track
-//   asset and SURVIVE playableAsset swaps — capture the WHOLE table.
-```
-Record these in the undo journal (§6) before any mutation.
-
-**Name resolution rule**: `GameObject.Find` misses inactive objects and is ambiguous on
-duplicate names. Confirm the chosen name is active and unique in the SubScene; otherwise walk
-the SubScene roots to the recorded hierarchy path (or `FindObjectsByType` filtered by `scene`)
-instead of `Find`.
-
-## 4. CANONICAL RECIPES
-
-One logical change per exec block; print `PRE|` captures before mutating, save inside the
-block, verify from a fresh load (§7). Same SubScene-bracket skeleton as the CopyTransform skill
-§4.1. Clip patterns (fields are PascalCase):
+The SubScene bracket is shared `unity-timeline-track-authoring` §2; below is only the
+track-specific middle (fields are PascalCase — set via `SerializedObject` + YAML names if direct
+assignment fails to compile):
 
 ```csharp
 var track = timeline.CreateTrack<BovineLabs.Timeline.EntityLinks.Authoring.EntityLinkTargetPatchTrack>(null, trackName);
@@ -228,7 +207,7 @@ var clipA = track.CreateClip<BovineLabs.Timeline.EntityLinks.Authoring.EntityLin
 clipA.start = 0; clipA.duration = 0.5; clipA.displayName = "<clipName>";   // length cosmetic (edge-trigger)
 var a = (BovineLabs.Timeline.EntityLinks.Authoring.EntityLinkTargetPatchClip)clipA.asset;
 a.Link = schema;
-a.ReadRootFrom = BovineLabs.Reaction.Data.Core.Target.Self;   // <DERIVED §3.4> — default Source is a trap
+a.ReadRootFrom = BovineLabs.Reaction.Data.Core.Target.Self;   // <DERIVED §3> — default Source is a trap
 a.WriteTo  = BovineLabs.Reaction.Data.Core.Target.Custom;     // <CHOSEN> slot; None/Self won't bake
 a.Fallback = BovineLabs.Reaction.Data.Core.Target.None;       // skip-don't-corrupt (the safety default)
 
@@ -236,135 +215,60 @@ a.Fallback = BovineLabs.Reaction.Data.Core.Target.None;       // skip-don't-corr
 // WriteTo=Self is a bake error) — an always-non-null deliberate fallback write.
 
 // Pattern DELIBERATE-MISS SLOT COPY: Link = a schema whose key is PROVABLY absent from
-// the root's buffer (§3.4) + Fallback=<srcSlot> + WriteTo=<dstSlot> — the only way
+// the root's buffer (§3) + Fallback=<srcSlot> + WriteTo=<dstSlot> — the only way
 // TargetPatch can move values between Targets slots.
 ```
 
 **The honest park-then-restore compensator** (the RUNTIME undo a designer authors; distinct
-from the agent's editor undo journal in §6): (1) at window start, a deliberate-miss clip with
-`Fallback=<patched slot>, WriteTo=<spare slot>` parks the original value; (2) the real patch;
-(3) at window end, the inverse deliberate-miss `Fallback=<spare slot>, WriteTo=<patched slot>`
-restores it. Constraints that make this fragile: it burns a Targets slot for the whole window;
-anything else writing that slot (another TargetPatch, gameplay code) corrupts the restore; and
-the "guaranteed miss" key must stay absent — a Mutate Assign of that key mid-window would turn
-the restore into a link-resolved write. Its failure mode was demonstrated live (§5): the
-compensator restores whatever the parking slot holds NOW, not the authored original — once no
-slot remembers the original, the information is simply gone.
+from the agent's editor undo journal in shared §3): (1) at window start, a deliberate-miss clip
+with `Fallback=<patched slot>, WriteTo=<spare slot>` parks the original value; (2) the real
+patch; (3) at window end, the inverse deliberate-miss `Fallback=<spare slot>, WriteTo=<patched
+slot>` restores it. Constraints that make this fragile: it burns a Targets slot for the whole
+window; anything else writing that slot (another TargetPatch, gameplay code) corrupts the
+restore; and the "guaranteed miss" key must stay absent — a Mutate Assign of that key mid-window
+would turn the restore into a link-resolved write. Its failure mode was demonstrated live (§5):
+the compensator restores whatever the parking slot holds NOW, not the authored original — once
+no slot remembers the original, the information is simply gone.
 
-`EXPECTED:` the training report preserved field VALUES and YAML, not the authoring exec code —
-if direct field assignment fails to compile, set via `SerializedObject` using the YAML field
-names in §7.
+**Undo note (track-specific addendum to shared §3):** RUNTIME effects exist in play mode only —
+the `Targets`-slot patch persists within a play session (THE HEADLINE; runtime-side it is the
+family's weakest undo, recoverable only via the fragile compensator above) but is discarded with
+the runtime world and never writes back to authoring data. The agent's journal undoes AUTHORING
+artifacts only, which fully reverses everything that persists in the editor. Schemas and the link
+root are never created or modified — nothing to undo there; the guaranteed-miss property of the
+deliberate-miss schema is authored state owned by the stage.
 
-## 5. WORKED EXAMPLE (vex-ee training stage) — example environment; rediscover, never assume
+**Verification addendum (to shared §4):** the §4 raw-YAML/asset-dump step must confirm field
+names are **PascalCase in YAML too** (`Link:`, `ReadRootFrom:`, `WriteTo:`, `Fallback:`) and the
+`Link:` ref is `{fileID: 11400000, guid: …, type: 2}` (never `{fileID: 0}` unless deliberately
+demoing); for a deliberate-miss clip, RE-VERIFY the key is still absent from the intended root's
+authored key set; cast `Link` to `UnityEngine.Object` before `GetAssetPath`.
 
-- Project `/home/i/GitHub/vex-ee`; parent scene `Assets/Scenes/Main Scene.unity`; SubScene
-  `Assets/Scenes/Main Sub Scene.unity`; package under `Packages/`. Stage: `Stage_Director` (the
-  only director); `Stage_Actor` (TargetsAuthoring Owner=null, Source=null, Target=Stage_Target,
-  Custom=null; EntityLinkSource Root=Stage_LinkRoot, Schemas=[Schema_Actor]); `Stage_LinkRoot`
-  bakes `{Key=10, Target=Stage_Actor}` — key 3 ("Root Link") is deliberately ABSENT, the
-  guaranteed-miss key. Schemas: Schema_Actor id=10 guid=3b375c42affc2917f956d01310d31894; Root
-  Link id=3 guid=c0c683033c37a137fae122e6ee8300c9 (full 10-schema inventory: Mutate skill §5).
-- Asset built: `Assets/Training/10-entitylink-targetpatch-track/TargetPatchMastery.playable` —
-  track `TargetPatchTrack`; clips: `A_PatchCustomToLinked 0–0.5 Link=Schema_Actor(10)
-  ReadRootFrom=Self(4) WriteTo=Custom(6) Fallback=None(0)` (safe patch); `B_RetargetToCustom
-  2–2.5 WriteTo=Target(1) Fallback=Self(4)` (fallback write); `C_CompensateRestore 4–4.5
-  Link=Root Link(3) WriteTo=Target(1) Fallback=Custom(6)` (deliberate-miss restore). YAML keeps
-  PascalCase names (`Link:`, `ReadRootFrom: 4`, `WriteTo: 6`, `Fallback: 0`), schema refs as
-  plain asset→asset guids; the clip sub-assets kept the default `m_Name:
-  EntityLinkTargetPatchClip`.
-- The compensator failure, demonstrated on this timeline: after A and B run, the slots are
-  `{Owner=Null, Source=Null, Target=Stage_Actor, Custom=Stage_Actor}` — clip C writes
-  Stage_Actor, not the original Stage_Target; no slot remembers Stage_Target and the system
-  never stored it.
-- Demos run in training: temp clips D (WriteTo=Self) and E (WriteTo=None) → real forced bake
-  (ALL `.sceneWithBuildSettings` artifacts produced) → `cannot write to 'Self'.` / `cannot
-  write to 'None'.` at `EntityLinkTargetPatchClip.cs:31`; temp clips removed; clean rebake
-  proven by changed artifact hash (`65802f91…` → `11cc804d…`), zero new error lines.
-- Wiring after the lesson: director RESTORED to
-  `Assets/Training/01-transform-position-track/PositionMastery.playable`; binding table 8
-  entries, all → Stage_Actor (B7 = TargetPatchTrack → TargetsAuthoring — left as permanent
-  additive stage state). Known pre-existing vex-ee console entries: UnityCliConnector HTTP
-  server start, PerformanceTesting IPrebuildSetup/IPostBuildCleanup, TestResults.xml save,
-  lessons 08/09's `E_TempNullLink` / `C_TempNullLink` demo lines.
+## 5. WORKED EXAMPLE (vex-ee training stage — delta vs shared §5; rediscover, never assume)
 
-## 6. UNDO APPENDIX
+Asset built: `Assets/Training/10-entitylink-targetpatch-track/TargetPatchMastery.playable` —
+track `TargetPatchTrack`, bound to `Stage_Actor`'s `TargetsAuthoring`. Clips (PascalCase YAML):
+`A_PatchCustomToLinked 0–0.5 Link=Schema_Actor(10) ReadRootFrom=Self(4) WriteTo=Custom(6)
+Fallback=None(0)` (safe patch); `B_RetargetToCustom 2–2.5 WriteTo=Target(1) Fallback=Self(4)`
+(fallback write); `C_CompensateRestore 4–4.5 Link=Root Link(3) WriteTo=Target(1)
+Fallback=Custom(6)` (deliberate-miss restore). Clip sub-assets kept the default `m_Name:
+EntityLinkTargetPatchClip`.
 
-Artifact inventory for one run of §4 (vex-ee instance shown in §5):
-1. Created asset `<assetPath>` (.playable: TimelineAsset + track + clip sub-assets —
-   `DeleteAsset` removes all sub-assets with the file).
-2. Possibly-created folder(s) `<assetFolder>` (only if `PRE|folderExisted=false`).
-3. Mutated `director.playableAsset` (vex-ee pre value: PositionMastery, restored in-run;
-   capture YOURS per §3.5).
-4. Added generic-binding entry for the new track (SubScene file; SURVIVES playableAsset swaps —
-   vex-ee left it as permanent stage state; full undo must `ClearGenericBinding` it).
-   `EXPECTED:` the report proves the POST table (8 entries) and the prior asset's restore but
-   never printed the pre-wiring table as `PRE|` lines — derivably the 7 pre-TargetPatch
-   entries; capture your own table verbatim per §3.5.
-5. If the bake-error demos were reproduced: temp clips (training removed them), two deliberate
-   console LogError lines, and new bake artifact hashes in `Library/` — console history and
-   derived caches are not undoable state; record them in the card.
-6. RUNTIME effects: **none exist in the editor.** The `Targets`-slot patch is play-mode-only:
-   it persists within a play session (THE HEADLINE — and runtime-side it is the family's
-   weakest undo, recoverable only via the fragile park-then-restore compensator) but is
-   discarded with the runtime world and never writes back to authoring data. No play mode was
-   entered in training, so no `Targets` slot was ever actually patched. The agent's journal
-   below undoes AUTHORING artifacts only — which fully reverses everything that persists in
-   the editor.
-7. Schemas: never created, never modified — nothing to undo. The guaranteed-miss property of
-   the deliberate-miss schema is authored state owned by the stage, not by this agent.
+Stage layout used: `Stage_Actor` (TargetsAuthoring Owner=null, Source=null, Target=Stage_Target,
+Custom=null; EntityLinkSource Root=Stage_LinkRoot, Schemas=[Schema_Actor]); `Stage_LinkRoot`
+bakes `{Key=10, Target=Stage_Actor}` — key 3 ("Root Link") is deliberately ABSENT, the
+guaranteed-miss key. Schemas: Schema_Actor id=10 guid=3b375c42affc2917f956d01310d31894; Root
+Link id=3 guid=c0c683033c37a137fae122e6ee8300c9 (full 10-schema inventory: Mutate skill §5).
 
-ORDER: restore the director FIRST, THEN delete the asset, THEN other captured scene values —
-deleting the asset while the director still points at it would leave a dangling `{fileID: 0}`-
-style reference in the scene file instead of the captured pre-state.
+The compensator failure, demonstrated on this timeline: after A and B run, slots are
+`{Owner=Null, Source=Null, Target=Stage_Actor, Custom=Stage_Actor}` — clip C writes Stage_Actor,
+not the original Stage_Target; no slot remembers Stage_Target and the system never stored it.
 
-Journal entry templates (protocol §5 — fill from YOUR captures, reverse order):
-
-```csharp
-// UNDO-1: restore director's captured playableAsset + binding table (SubScene bracket).
-// Identical skeleton to the CopyTransform skill's UNDO-1: open SubScene additively,
-// ClearGenericBinding every output track of MY asset, re-bind each CAPTURED PRE|binding| line
-// (reload the PREVIOUS asset by captured path, match track by name/index, re-find the bound
-// object by captured hierarchy path, bind the captured COMPONENT type), director.playableAsset
-// = <CAPTURED pre value, never "default">, SetDirty, SaveScene, restore parent Single in
-// finally. return "UNDONE|director restored";
-```
-
-```csharp
-// UNDO-2: delete the created .playable (+ folder, only if PRE|folderExisted=false and now empty)
-var assetPath = "<CAPTURED>"; var assetFolder = "<CAPTURED>"; var folderExisted = false; // <CAPTURED>
-var ok = UnityEditor.AssetDatabase.DeleteAsset(assetPath);
-if (!folderExisted && UnityEditor.AssetDatabase.FindAssets("", new[]{ assetFolder }).Length == 0)
-    UnityEditor.AssetDatabase.DeleteAsset(assetFolder);
-return "UNDONE|deleted=" + ok + "|" + assetPath;
-```
-
-```csharp
-// UNDO-3: restore any other captured scene values — normally none beyond UNDO-1 for this track
-// family (it never moves editor objects; schemas, the link root and the authored
-// TargetsAuthoring slots are never touched by AUTHORING work).
-```
-
-UNDO-4 (verification, fresh load — protocol §7): reload the SubScene additively;
-`director.playableAsset` must equal the CAPTURED pre value and the binding table the captured
-`PRE|binding|` lines; confirm `AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(assetPath) ==
-null`; restore the parent scene; `unity-cli console --filter error` clean against the project
-baseline (§5).
-
-## 7. VERIFICATION PROTOCOL
-
-1. **Fresh-load asset dump**: `AssetDatabase.LoadAssetAtPath` the `.playable` in a NEW exec
-   block; dump track + clips (name, start/end, Link asset + imported id — cast to
-   `UnityEngine.Object` before `GetAssetPath` — ReadRootFrom, WriteTo, Fallback). In-memory
-   state after a save is not evidence. (vex-ee expectation: §5.)
-2. **Raw YAML check**: `Link:` is `{fileID: 11400000, guid: …, type: 2}` (never `{fileID: 0}`
-   unless deliberately demoing); enum bytes match intent; field names PascalCase in YAML too.
-3. **Schema check**: each referenced schema's fresh YAML `id:` non-zero; for a deliberate-miss
-   clip, RE-VERIFY the key is still absent from the intended root's authored key set.
-4. **Binding check from a RELOADED SubScene**: `BINDING|<trackName>|bound=<bindTarget>
-   (TargetsAuthoring)` — the COMPONENT, not the Transform — and all captured prior bindings
-   intact.
-5. **Parent-scene restore**: end with `sceneCount=1`,
-   `scene[0]=<parentScenePath>|loaded=True|active=True|dirty=False`.
-6. **Console**: `unity-cli console --filter error` shows nothing new beyond the project baseline
-   except any DELIBERATE `cannot write to 'Self'` / `cannot write to 'None'` demos — remove the
-   temp clips and prove the clean rebake via a CHANGED artifact hash with zero new error lines.
+Bake-error demos: temp clips D (WriteTo=Self) and E (WriteTo=None) → real forced bake (ALL
+`.sceneWithBuildSettings` artifacts produced) → `cannot write to 'Self'.` / `cannot write to
+'None'.` at `EntityLinkTargetPatchClip.cs:31`; temp clips removed; clean rebake proven by changed
+artifact hash (`65802f91…` → `11cc804d…`), zero new error lines. After the lesson the director
+was RESTORED to `Assets/Training/01-transform-position-track/PositionMastery.playable`; the
+binding table held 8 entries, B7 = TargetPatchTrack → TargetsAuthoring (left as permanent
+additive stage state — the report proved the POST table but not the 7 pre-TargetPatch entries as
+`PRE|` lines; capture your own table verbatim).

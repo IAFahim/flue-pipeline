@@ -1,4 +1,5 @@
 import { createAgent, type Skill } from '@flue/runtime';
+import { DEFAULT_MODEL } from './keys';
 import unityCli from './skills/unity-cli/SKILL.md' with { type: 'skill' };
 import agentProtocol from './skills/unity-agent-protocol/SKILL.md' with { type: 'skill' };
 import playerInput from './skills/unity-player-input/SKILL.md' with { type: 'skill' };
@@ -28,13 +29,20 @@ import transformPosition from './skills/unity-track-transform-position/SKILL.md'
 import transformRotation from './skills/unity-track-transform-rotation/SKILL.md' with { type: 'skill' };
 import transformScale from './skills/unity-track-transform-scale/SKILL.md' with { type: 'skill' };
 import worldTimeScale from './skills/unity-track-world-timescale/SKILL.md' with { type: 'skill' };
+import timelineTrackAuthoring from './skills/unity-timeline-track-authoring/SKILL.md' with { type: 'skill' };
+import trackAnimation from './skills/unity-track-animation/SKILL.md' with { type: 'skill' };
+import trackPlayerInputs from './skills/unity-track-player-inputs/SKILL.md' with { type: 'skill' };
+import trackUi from './skills/unity-track-ui/SKILL.md' with { type: 'skill' };
+import trackGridInfluence from './skills/unity-track-grid-influence/SKILL.md' with { type: 'skill' };
+import trackParenting from './skills/unity-track-parenting/SKILL.md' with { type: 'skill' };
 
 // The default model every expert runs on. Any request may override it (the
 // track-task workflow threads `payload.model` through to expertFor), so the
 // Editor / unity-cli side can drive ANY provider/model the runtime supports
 // (e.g. minimax/…, anthropic/…, openai/…) just by setting the provider key in
 // .env and passing the `provider/model` string — the model layer lives here.
-export const DEFAULT_MODEL = 'minimax/MiniMax-M2.7';
+// DEFAULT_MODEL now lives in keys.ts (the single source of truth for models/keys); re-exported for back-compat.
+export { DEFAULT_MODEL };
 
 // One single-purpose expert per trained track mastery skill. Each carries the
 // hardened unity-cli operating skill, the unity-agent-protocol behavioral
@@ -56,10 +64,14 @@ function trackExpert(topic: string, masterySkill: Skill, model: string = DEFAULT
 	// and BUILD the missing stage itself rather than stopping on the missing
 	// prerequisite. The stage expert's own mastery skill IS that skill, so
 	// dedupe to avoid listing it twice.
+	// Every track expert ALSO carries unity-timeline-track-authoring: the de-bloated
+	// mastery skills cite it for all the shared ceremony (SubScene bracket, discovery,
+	// undo, verification), and the runtime can only ACTIVATE a skill that is in the
+	// agent's registered catalog — so it must be declared here, not just referenced.
 	const skills =
 		masterySkill === stageFoundations
-			? [unityCli, agentProtocol, playerInput, trackTask, trackUndo, stageFoundations]
-			: [unityCli, agentProtocol, playerInput, trackTask, trackUndo, stageFoundations, masterySkill];
+			? [unityCli, agentProtocol, playerInput, trackTask, trackUndo, stageFoundations, timelineTrackAuthoring]
+			: [unityCli, agentProtocol, playerInput, trackTask, trackUndo, stageFoundations, timelineTrackAuthoring, masterySkill];
 	return createAgent(() => ({
 		model,
 		skills,
@@ -111,6 +123,11 @@ const trackExperts: Record<string, ReturnType<typeof trackExpert>> = {
 	'unity-track-transform-rotation': trackExpert('TransformRotationTrack', transformRotation),
 	'unity-track-transform-scale': trackExpert('TransformScaleTrack', transformScale),
 	'unity-track-world-timescale': trackExpert('WorldTimeScaleTrack', worldTimeScale),
+	'unity-track-animation': trackExpert('Animation tracks (Rukhanka / BlendTree2D / AfterImage)', trackAnimation),
+	'unity-track-player-inputs': trackExpert('PlayerInputs tracks (CommandSequence / InputEvents)', trackPlayerInputs),
+	'unity-track-ui': trackExpert('UI tracks (UxmlView / TextReveal / DataDisplay)', trackUi),
+	'unity-track-grid-influence': trackExpert('Grid Influence tracks', trackGridInfluence),
+	'unity-track-parenting': trackExpert('Parenting (TemporaryDetach) track', trackParenting),
 };
 
 // --- The Ultimate Boss -------------------------------------------------------
@@ -146,6 +163,11 @@ export const masteryByName: Record<string, Skill> = {
 	'unity-track-transform-rotation': transformRotation,
 	'unity-track-transform-scale': transformScale,
 	'unity-track-world-timescale': worldTimeScale,
+	'unity-track-animation': trackAnimation,
+	'unity-track-player-inputs': trackPlayerInputs,
+	'unity-track-ui': trackUi,
+	'unity-track-grid-influence': trackGridInfluence,
+	'unity-track-parenting': trackParenting,
 };
 
 const allMastery: Skill[] = Object.values(masteryByName);
@@ -177,7 +199,7 @@ export function buildBoss(masteryNames: string[] = [], model: string = DEFAULT_M
 	const mastery = chosen.length ? chosen : allMastery;
 	return createAgent(() => ({
 		model,
-		skills: [unityCli, agentProtocol, playerInput, trackTask, trackUndo, ...mastery],
+		skills: [unityCli, agentProtocol, playerInput, trackTask, trackUndo, timelineTrackAuthoring, ...mastery],
 		instructions: BOSS_INSTRUCTIONS,
 	}));
 }

@@ -1,6 +1,6 @@
 ---
 name: unity-track-timeline-timescale
-description: Master of TimelineTimeScaleTrack + TimelineTimeScaleClip (package BovineLabs.Timeline.Time) — stat-driven per-timeline playback speed, the StatAuthoring track binding, StatDefaults setup, and the frozen-timeline stat trap (buffer present, key missing → 0). Portable to any project containing the package; worked example from vex-ee. Use when a designer asks to "slow this cutscene" or "make timeline speed follow a stat".
+description: Master of TimelineTimeScaleTrack + TimelineTimeScaleClip (package BovineLabs.Timeline.Time) — stat-driven per-timeline playback speed, the StatAuthoring track binding, StatDefaults setup, and the frozen-timeline stat trap (buffer present, key missing → 0). Portable to any project containing the package; worked example from vex-ee.
 ---
 
 # TimelineTimeScaleTrack specialist
@@ -15,7 +15,11 @@ resolve, and the per-timeline clock semantics. This track is **PER-TIMELINE ONLY
 director's own clock and nothing else. Global slow-mo (the world clock, every timeline) is
 `WorldTimeScaleTrack`'s job — the `unity-track-world-timescale` skill; know the boundary. Stage
 construction belongs to `unity-stage-foundations`; transform tracks to the position/rotation/scale
-skills. Behave per unity-agent-protocol; operate the editor per unity-cli.
+skills. The stat side cross-references `unity-track-essence-stat` (the ×100 fixed-point model).
+
+Operate per `unity-timeline-track-authoring`; behave per `unity-agent-protocol`; use the editor
+per `unity-cli`. Discovery is its §1 (add the StatAuthoring bind-target + stat-schema lookups
+below); the SubScene bracket its §2; the undo appendix its §3; verification its §4.
 
 ## 2. PORTABLE SEMANTICS
 
@@ -31,7 +35,7 @@ Types (assembly `BovineLabs.Timeline.Time.Authoring`):
   (YAML carries only the inherited `DOTSTrack` `resetOnDeactivate`). Its Bake targets
   `context.Timer` — the timeline's own clock entity — NOT the binding.
 - `BovineLabs.Timeline.Time.Authoring.TimelineTimeScaleClip : DOTSClip`
-  — `ClipCaps.Blending | Looping`.
+  — `[TrackClipType]` of the track; `ClipCaps.Blending | Looping`.
 
 ### TimelineTimeScaleClip fields
 | Member | Type | Default | Meaning |
@@ -81,13 +85,18 @@ can only touch the `ClockData` on the SAME entity as the multiplier, i.e. this t
 It never writes `UnityEngine.Time.timeScale` and never touches other timelines' clocks.
 `WorldTimeScaleTrack` instead scales the source `ClockUpdateSystem` reads from — every timeline.
 
+### Silence profile
+DOTS-track-typical: no Timeline-editor error for any misconfiguration below. An empty/unresolvable
+binding does NOT error (the track bakes against `context.Timer`, not the binding); a missing stat
+key does NOT error — it silently freezes the timeline (`×0`). Silence is expected, never proof.
+
 ### Traps & DO/DON'T (each proven live, vex-ee 2026-06)
 - **DON'T conflate the two frozen-timeline failure modes** — fallback to `AuthoredData` happens ONLY
   when a PrepareJob guard fails: `StatKey == 0` (stat null), `StatEntity == Entity.Null` (no
   binding), or the entity has NO `Stat` buffer at all (`TryGetBuffer` false). **Buffer present but
   key absent** passes the guard → `GetValueFloat` returns 0 → `clock.DeltaTime *= 0` → **frozen
   timeline**, silent and strictly worse than the graceful fallback. The StatDefaults entry (recipe
-  4.1) is what puts the key in the baked buffer — but key presence alone isn't enough: a fractional
+  below) is what puts the key in the baked buffer — but key presence alone isn't enough: a fractional
   `Added` default truncates to int 0 at bake, the same freeze by another road (×100 fixed-point fact
   above; discovered in vex-ee lesson 13, see §5).
 - **DO use `stat = null` for pure authored mode** — serializes as `stat: {fileID: 0}`, bakes
@@ -102,245 +111,136 @@ It never writes `UnityEngine.Time.timeScale` and never touches other timelines' 
   stays a GameObject, a component stays a component). At bake time both forms reach the same entity
   (`ConversionContextExtensions.GetBinding` switches on GameObject/Component);
   `[TrackBindingType(typeof(StatAuthoring))]` only governs the editor drag-slot. Bind the component
-  for clarity.
+  for clarity. (This is unity-cli 5k; the bind target here is the **StatAuthoring component**, not a
+  Transform — the one place this family diverges from transform-track bind targets.)
 - **DON'T treat the `duration => 1` override as a fixed length** — it only seeds the initial
   TimelineClip length at `CreateClip`; `clip.duration = 2` persisted.
 - **NEVER create new StatSchemaObject assets** — keys are auto-ID registry entries (`[AutoRef]` →
   EssenceSettings.statSchemas); polluting the registry is permanent. Reuse the project's existing
-  schemas (discover them, §3.4).
-- **DO trust director binding tables across playableAsset swaps** — entries are keyed by track
-  asset; in vex-ee all four mastery bindings survived the swap-back to the prior asset.
+  schemas (discover them, below). Out of domain — report a missing schema, never author one.
 
-## 3. DISCOVERY RECIPES
+## 3. DISCOVERY DELTA
 
-Act only through `unity-cli exec` / `unity-cli console`; never the filesystem; never
-play mode. Follow the unity-cli Safe Loop on every mutation. Names below are
-parameters — discover them in THIS project; never assume the worked example (§5).
+Run the unity-timeline-track-authoring §1 preamble (D1–D5) with these type names:
+`TimelineTimeScaleTrack` / `TimelineTimeScaleClip` / assembly `BovineLabs.Timeline.Time.Authoring`.
+Two track-specific additions to its D4/D5:
 
-**3.1 Confirm the package exists (else report a missing prerequisite — protocol §6):**
-```csharp
-var t = System.Type.GetType("BovineLabs.Timeline.Time.Authoring.TimelineTimeScaleTrack, BovineLabs.Timeline.Time.Authoring");
-return t == null ? "MISSING_PREREQUISITE|TimelineTimeScaleTrack not found - package BovineLabs.Timeline.Time absent here"
-                 : "OK|" + t.AssemblyQualifiedName + "|dataPath=" + UnityEngine.Application.dataPath;
-```
+- **Bind target = a StatAuthoring component** (not a Transform):
+  `FindObjectsByType<BovineLabs.Essence.Authoring.StatAuthoring>(Include, None)` filtered to the
+  SubScene. No StatAuthoring anywhere → the stat override is impossible (authored-only mode still
+  works; report the gap — a stage/essence specialist adds authoring components, not you). Find the
+  schema by TYPE never path: `AssetDatabase.FindAssets("t:StatSchemaObject")`; pick the designer's
+  named stat, confirm `key != 0` (registered) by reading the asset.
+- **Capture the StatDefaults array as extra PRE| state** (beyond §1's playableAsset + binding lines):
+  `PRE|statDefaults|size=<N>` and one `PRE|statDefaults|<i>|Stat=<schema name + path>|ModifyType=<enum>|Value=<float>`
+  per existing element (SerializedObject dump of the chosen StatAuthoring's `StatDefaults`). The undo
+  restores THIS array, never an empty one — other entries may pre-exist and other stat-driven track
+  families may depend on them.
 
-**3.2 Find the active scene + SubScene(s):** the unity-cli First Command → `parentScenePath`, `subScenePath`(s).
+## 4. CLIP PATTERNS (the bracket's track-specific middle)
 
-**3.3 Find PlayableDirector(s) inside the SubScene** (read-only additive open, restore parent
-after): `FindObjectsByType<PlayableDirector>(Include, None)`; print per director its hierarchy path,
-`playableAsset`, other components. Selection rule when several exist (STATE it in your memory card):
-prefer the single director in the chosen SubScene; if several, prefer one carrying the project's
-timeline-reference authoring component. Zero → missing prerequisite, protocol §6.
+Slot these into the unity-timeline-track-authoring §2 bracket (one logical change per exec block;
+print `PRE|` before mutating; verify per §4 in a SEPARATE block). Timings/values are example
+choices, not package constants.
 
-**3.4 Find the bind target and the stat schema** — the binding is a **StatAuthoring component** on a
-SubScene-baked object: `FindObjectsByType<BovineLabs.Essence.Authoring.StatAuthoring>(Include, None)`
-filtered to the SubScene; no StatAuthoring anywhere → the stat override is impossible (authored-only
-mode still works; report the gap — a stage/essence specialist adds authoring components, not you).
-Find schemas by TYPE, never by path: `AssetDatabase.FindAssets("t:StatSchemaObject")`; pick the
-designer's named stat, confirm its `key != 0` (registered) by reading the asset. NEVER create one.
-
-**3.5 Capture pre-state — this is pre-state (`PRE|`)**:
-```csharp
-// PRE|playableAsset=<asset PATH or null>   via AssetDatabase.GetAssetPath(director.playableAsset)
-// PRE|binding|<i>|<track name>|<track type>|<bound object hierarchy path + component type, or null>
-//   one line per GetOutputTracks() of the CURRENT asset, via director.GetGenericBinding(track).
-//   Capture the asset PATH and each track's NAME/index even when the table looks empty —
-//   they make the undo journal replayable (UNDO-1 reloads the old asset by path and
-//   re-binds by matching track name/index).
-// PRE|statDefaults|size=<N> and one line per EXISTING element:
-//   PRE|statDefaults|<i>|Stat=<schema name + asset path>|ModifyType=<enum>|Value=<float>
-//   — full dump of the chosen StatAuthoring's StatDefaults array (SerializedObject). The undo
-//   restores THIS array, never an empty one: other entries may pre-exist and other stat-driven
-//   track families may depend on them.
-// Record ALL of these in the undo journal (§6) before any mutation.
-```
-
-**Name resolution rule**: `GameObject.Find` misses inactive objects and is ambiguous on duplicate
-names. Discovery (§3.3/3.4) must confirm the chosen name is active and unique in the SubScene; else
-resolve by walking SubScene roots to the recorded hierarchy path (or `FindObjectsByType` filtered by
-`scene`) instead of `Find`.
-
-## 4. CANONICAL RECIPES
-One logical change per exec block; each block prints its `PRE|` capture before mutating (protocol
-§2), saves inside the block, and is verified from a fresh load (§7).
-
-**4.1 Give an entity a stat default (UNIVERSAL for ALL stat-driven track families — Distance,
-Essence, EssenceUI…).** The "designer sets up the stat" step; the canonical SerializedObject append
-pattern. SubScene bracket assumed:
+**4.1 "the stat must be there first" — give the bound entity a stat default** (UNIVERSAL for ALL
+stat-driven track families — Distance, Essence, EssenceUI…). The canonical SerializedObject append
+on the **bind target's StatAuthoring** (scene state, separate from the asset). Capture the full
+`PRE|statDefaults|` dump first; PRINT the append index (undo removes exactly it):
 
 ```csharp
-var schemaPath  = "<DISCOVERED>";   // §3.4 — an EXISTING registered schema
-var statValue   = 25f;              // <CHOSEN> — ×100 fixed-point: 25 means a 0.25 factor
-                                    // (a fractional value like 0.25 truncates to int 0 at bake = freeze)
-// CAPTURE (print + journal) BEFORE mutating: the full PRE|statDefaults| dump (§3.5)
-var stat   = /* resolve bind target per Name resolution rule */.GetComponent<BovineLabs.Essence.Authoring.StatAuthoring>();
-var schema = UnityEditor.AssetDatabase.LoadAssetAtPath<BovineLabs.Essence.Authoring.StatSchemaObject>(schemaPath);
+var schema = UnityEditor.AssetDatabase.LoadAssetAtPath<BovineLabs.Essence.Authoring.StatSchemaObject>("<DISCOVERED registered schema>");
+var stat = /* bind target, Name-resolution rule */.GetComponent<BovineLabs.Essence.Authoring.StatAuthoring>();
 var so = new UnityEditor.SerializedObject(stat); so.Update();
 var defaults = so.FindProperty("StatDefaults");
-int i = defaults.arraySize;          // append index — PRINT IT (the undo removes exactly this element)
-defaults.arraySize = i + 1;
+int i = defaults.arraySize; defaults.arraySize = i + 1;   // PRINT i
 var elem = defaults.GetArrayElementAtIndex(i);
-elem.FindPropertyRelative("Stat").objectReferenceValue = schema;   // asset->scene-component ref: fine (scene side holds it)
+elem.FindPropertyRelative("Stat").objectReferenceValue = schema;       // asset->scene-component ref: fine
 var mod = elem.FindPropertyRelative("ModifyType");
-mod.enumValueIndex = System.Array.IndexOf(mod.enumNames, "Added"); // Added/Subtracted/Increased/Reduced/More/Less
-elem.FindPropertyRelative("Value").floatValue = statValue;
-so.ApplyModifiedProperties();
-UnityEditor.EditorUtility.SetDirty(stat); UnityEditor.SceneManagement.EditorSceneManager.SaveScene(subScene);
+mod.enumValueIndex = System.Array.IndexOf(mod.enumNames, "Added");     // Added/Subtracted/Increased/Reduced/More/Less
+elem.FindPropertyRelative("Value").floatValue = 25f;                   // ×100 fixed-point: 25 = 0.25 factor; 0.25 truncates to int 0 = freeze
+so.ApplyModifiedProperties(); UnityEditor.EditorUtility.SetDirty(stat);
 ```
 
-**4.2 Stat-driven timescale timeline.** Build the asset (clip-asset → schema-asset references
-serialize fine, no SubScene needed for this part):
+**4.2 "slow this cutscene to half speed" — pure authored mode.** One clip, `stat = null`:
 
 ```csharp
-var assetFolder = "<CHOSEN>"; var assetPath = assetFolder + "/<Name>.playable";
-// CAPTURE (print + journal): PRE|folderExisted=<bool> PRE|assetExisted=<bool>
-var timeline = UnityEngine.ScriptableObject.CreateInstance<UnityEngine.Timeline.TimelineAsset>();
-UnityEditor.AssetDatabase.CreateAsset(timeline, assetPath);
-var track = timeline.CreateTrack<BovineLabs.Timeline.Time.Authoring.TimelineTimeScaleTrack>(null, "<trackName>");
-
-var clipA = track.CreateClip<BovineLabs.Timeline.Time.Authoring.TimelineTimeScaleClip>();
-// fresh clip arrives with duration=1 (the clip's `duration => 1` override seeds it) — not fixed
-clipA.displayName = "<clipName>"; clipA.start = 0; clipA.duration = 2;
-var a = (BovineLabs.Timeline.Time.Authoring.TimelineTimeScaleClip)clipA.asset;
-a.timeScale = 0.5f; a.stat = null;                      // authored mode
-var clipB = track.CreateClip<BovineLabs.Timeline.Time.Authoring.TimelineTimeScaleClip>();
-clipB.displayName = "<clipName>"; clipB.start = 2; clipB.duration = 2;
-var b = (BovineLabs.Timeline.Time.Authoring.TimelineTimeScaleClip)clipB.asset;
-b.timeScale = 2.0f;                                     // decoy — the stat override wins when resolvable
-b.stat = schema;                                        // clip(asset) -> schema(asset): serializes fine
-UnityEditor.AssetDatabase.SaveAssets();
+var clip = (BovineLabs.Timeline.Time.Authoring.TimelineTimeScaleClip)
+    track.CreateClip<BovineLabs.Timeline.Time.Authoring.TimelineTimeScaleClip>().asset;
+clip.timeScale = 0.5f; clip.stat = null;   // first guard fails → AuthoredData every frame; YAML stat: {fileID: 0}
 ```
 
-Wire (SubScene bracket — the binding lives in the DIRECTOR's scene-side table; bind the
-**StatAuthoring component**, not the Transform). Print the §3.5 `PRE|` lines first:
+**4.3 "make timeline speed follow a stat" — stat-driven override.** Set `stat` to the discovered
+schema; `timeScale` becomes a decoy fallback used only when the stat is unresolvable. Bind the
+**StatAuthoring component** (4.1 must have seeded the key, or the timeline freezes):
 
 ```csharp
-pd.playableAsset = timeline;
-pd.SetGenericBinding(track, bindTarget.GetComponent<BovineLabs.Essence.Authoring.StatAuthoring>());
-UnityEditor.EditorUtility.SetDirty(pd);
-UnityEditor.SceneManagement.EditorSceneManager.SaveScene(subScene);
+b.timeScale = 2.0f;                            // decoy — the stat override wins when resolvable
+b.stat = schema;                               // clip(asset) -> schema(asset): serializes fine
+// in the §2 bracket's wiring:
+director.SetGenericBinding(track, bindTarget.GetComponent<BovineLabs.Essence.Authoring.StatAuthoring>());
 ```
 
-Timings/values above are example choices, not package constants; verify per §7 in SEPARATE blocks
-before claiming success.
+**4.4 "reverse / freeze it" — out-of-band timeScale.** `timeScale = -1` runs the clock in reverse;
+`0` freezes it. No clamp; both serialize verbatim. Same wiring as 4.2.
 
-## 5. WORKED EXAMPLE (vex-ee training stage) — example environment; rediscover, never assume
+## 5. WORKED EXAMPLE DELTA (vs the unity-timeline-track-authoring §5 stage)
 
-- Project: `/home/i/GitHub/vex-ee` (`dataPath=/home/i/GitHub/vex-ee/Assets`). Parent scene
-  `Assets/Scenes/Main Scene.unity`; SubScene `Assets/Scenes/Main Sub Scene.unity`.
-- Stage: `Stage_Director` (PlayableDirector + TimelineReferenceAuthoring),
-  `Stage_LinkRoot/Stage_Actor` (capsule with **StatAuthoring** — the binding), `Stage_Target`.
-  Schema inventory: **114** StatSchemaObjects under `Assets/Settings/Schemas/Stats/`; the one used:
-  `SlowMo.asset` (`m_Name: SlowMo`, `isGlobal: 0`, `key: 94` — nonzero → registered).
+Same vex-ee stage (rediscover, never assume). This track's specifics on top of §5:
+- Bind target is `Stage_LinkRoot/Stage_Actor`'s **StatAuthoring** (not its Transform). Schema used:
+  `Assets/Settings/Schemas/Stats/SlowMo.asset` (`key: 94`, nonzero → registered) out of 114 schemas.
 - Permanent stage state: Stage_Actor's StatAuthoring carries
   `StatDefaults[0] = {Stat: SlowMo, ModifyType: Added, Value: 25}` — added in lesson 04 as 0.25 and
   **corrected to 25 after lesson 13** (the original 0.25 truncated to int 0 at bake and froze the
-  timeline anyway: the ×100 fixed-point trap, §2). Lesson-04 fresh-load read-back at the time:
-  `StatDefaults.arraySize=1`, `data[0].Stat=SlowMo`, `ModifyType=Added`, `Value=0.250` — expect
-  `Value=25` on read-back today.
-- Asset built in training: `Assets/Training/04-timeline-timescale-track/TimeScaleMastery.playable`
-  — track `TimeScaleTrack`; fresh-load evidence:
+  timeline anyway — the ×100 trap, §2). A journal recorded at training time no longer matches; per
+  protocol §7 re-derive against current state before replaying a stale journal, and say so.
+- Asset: `Assets/Training/04-timeline-timescale-track/TimeScaleMastery.playable`, track
+  `TimeScaleTrack`. Fresh-load evidence:
   ```
   CLIP|A_HalfSpeed|start=0|duration=2|timeScale=0.5|stat=null
   CLIP|B_StatDriven|start=2|duration=2|timeScale=2|stat=SlowMo(key=94)
-  BINDING|3|key=TimeScaleTrack(TimelineTimeScaleTrack)|value=Stage_Actor(BovineLabs.Essence.Authoring.StatAuthoring)
+  BINDING|3|key=TimeScaleTrack(TimelineTimeScaleTrack)|value=Stage_Actor(StatAuthoring)
   ```
-  Clip A YAML: `timeScale: 0.5` / `stat: {fileID: 0}`. The binding and the StatDefaults entry were
-  deliberately left as permanent stage state; the director was restored to PositionMastery and all 4
-  bindings (Position/Scale/Rotation/TimeScale → Stage_Actor) survived the swap-back.
-- Binding-coercion evidence: `BIND_GO|...=UnityEngine.GameObject 'Stage_Actor'` vs
-  `BIND_COMP|...=StatAuthoring 'Stage_Actor'` — stored verbatim, both bake to the same entity.
-- Console baseline: UnityCliConnector HTTP server start, PerformanceTesting
-  IPrebuildSetup/IPostBuildCleanup, TestResults.xml save.
+  Binding-coercion evidence: `BIND_GO|...=GameObject 'Stage_Actor'` vs `BIND_COMP|...=StatAuthoring
+  'Stage_Actor'` — stored verbatim, both bake to the same entity. Director restored to
+  PositionMastery; all 4 bindings survived the swap-back.
 
-## 6. UNDO APPENDIX
-Artifact inventory for one full run of §4 (vex-ee instance shown in §5):
-1. Created asset `<assetPath>` (.playable: TimelineAsset + 1 track + clip sub-assets —
-   `DeleteAsset` removes all sub-assets with the file).
-2. Possibly-created folder(s) `<assetFolder>` (`EXPECTED:` the lesson-04 report never printed
-   `folderExisted` — capture it yourself per recipe 4.2).
-3. Mutated `director.playableAsset` (vex-ee: `EXPECTED:` the pre-wiring value was not printed as a
-   `PRE|` line — the restore target was PositionMastery per the report's final state; capture yours
-   per §3.5).
-4. Added generic-binding entry `<trackName> → <StatAuthoring component>` (lives in the SubScene
-   file; in vex-ee deliberately left as permanent stage state).
-5. Appended StatDefaults element(s) on the bound StatAuthoring — scene state on the BIND TARGET,
-   independent of the asset. The undo must restore the CAPTURED array (remove exactly the appended
-   index/indices), **never zero or rebuild it**: other entries may pre-exist and other stat-driven
-   track families may depend on them. (vex-ee: pre-append size is derivably 0 — the recipe appended
-   at `arraySize` and read back `arraySize=1` — but `EXPECTED:` no `PRE|statDefaults|` dump was
-   printed; capture the full array yourself per §3.5.)
-6. vex-ee staleness note: the lesson-04 entry was later corrected (0.25 → 25) by lesson 13, so a
-   journal recorded at training time no longer matches reality — per protocol §7, re-derive against
-   current state before running a stale journal, and say so.
+## 6. UNDO DELTA
 
-ORDER: restore the director FIRST (playableAsset + binding) so nothing in the scene references the
-asset, THEN delete the asset, THEN restore the StatAuthoring's StatDefaults — deleting the asset
-while the director still points at it would leave a dangling `{fileID: 0}`-style reference in the
-scene file instead of the captured pre-state. (The StatDefaults restore is order-independent of the
-asset; it sits last in the "other captured scene values" slot.)
+Follow the unity-timeline-track-authoring §3 appendix (UNDO-1 director+binding, UNDO-2 asset+folder,
+UNDO-4 fresh-load verify). This track adds ONE artifact and one ordering note:
 
-Journal entry templates (protocol §5 — fill from YOUR captures, reverse order):
+- **Extra artifact (the §3 "track-specific extra" slot): the appended StatDefaults element** on the
+  bound StatAuthoring — scene state on the BIND TARGET, independent of the asset. Restore the
+  **CAPTURED array** (remove exactly the appended index), **never zero or rebuild it**: other
+  entries may pre-exist and other stat-driven track families may depend on them. ORDER: it sits LAST
+  (after director restore + asset delete); it is order-independent of the asset.
 
 ```csharp
-// UNDO-1: restore director's captured playableAsset + binding table (SubScene bracket)
-var director = /* resolve by CAPTURED hierarchy path */;
-var myAsset = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.Timeline.TimelineAsset>("<assetPath>");
-foreach (var tr in myAsset.GetOutputTracks())
-    director.ClearGenericBinding(tr);            // removes the StatAuthoring entry I added
-// restore each CAPTURED binding (PRE|binding| lines; none if the table was empty):
-// reload the PREVIOUS asset by captured path, match tracks by name/index, re-find each
-// bound object by its captured hierarchy path, then SetGenericBinding.
-director.playableAsset =                         // restore CAPTURED value, never "default"
-    null /* or AssetDatabase.LoadAssetAtPath<UnityEngine.Playables.PlayableAsset>("<CAPTURED pre path>") */;
-UnityEditor.EditorUtility.SetDirty(director);
-UnityEditor.SceneManagement.EditorSceneManager.SaveScene(subScene);
-```
-
-```csharp
-// UNDO-2: delete the created .playable (+ folder, only if PRE|folderExisted=false and now empty)
-var ok = UnityEditor.AssetDatabase.DeleteAsset("<assetPath>");
-if (!folderExisted && UnityEditor.AssetDatabase.FindAssets("", new[]{ "<assetFolder>" }).Length == 0)
-    UnityEditor.AssetDatabase.DeleteAsset("<assetFolder>");
-return "UNDONE|deleted=" + ok;
-```
-
-```csharp
-// UNDO-3: remove the StatDefaults element I appended — restore the CAPTURED array, never zero it (SubScene bracket)
+// UNDO-3 (the track-specific extra): remove the appended StatDefaults element — SubScene bracket
 var appendedIndex = 0; // <CAPTURED> — the index printed by recipe 4.1
-var stat = /* resolve bind target by CAPTURED hierarchy path */.GetComponent<BovineLabs.Essence.Authoring.StatAuthoring>();
+var stat = /* bind target by CAPTURED hierarchy path */.GetComponent<BovineLabs.Essence.Authoring.StatAuthoring>();
 var so = new UnityEditor.SerializedObject(stat); so.Update();
 var defaults = so.FindProperty("StatDefaults");
-// guard: the element at appendedIndex must still match what I added (schema/ModifyType/Value);
+// guard: element at appendedIndex must still match what I added (schema/ModifyType/Value);
 // if not, reality drifted — re-derive per protocol §7 instead of deleting blind.
 defaults.DeleteArrayElementAtIndex(appendedIndex);
-so.ApplyModifiedProperties();
-UnityEditor.EditorUtility.SetDirty(stat);
+so.ApplyModifiedProperties(); UnityEditor.EditorUtility.SetDirty(stat);
 UnityEditor.SceneManagement.EditorSceneManager.SaveScene(subScene);
 // then assert the array equals the PRE|statDefaults| dump (size + every element), not merely "smaller".
 ```
 
-UNDO-4 (verification, fresh load — protocol §7): reload the SubScene additively and
-print `director.playableAsset` (must equal the CAPTURED pre value), the binding table
-(must equal the captured `PRE|binding|` lines), and the StatAuthoring's StatDefaults
-(must equal the `PRE|statDefaults|` dump); confirm
-`AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(assetPath) == null`; restore the
-parent scene; `unity-cli console --filter error` clean against the project baseline.
+UNDO-4 verification additionally asserts the bound StatAuthoring's StatDefaults equals the captured
+`PRE|statDefaults|` dump (size + every element), beyond §4's playableAsset / binding / asset-gone
+checks.
 
-## 7. VERIFICATION PROTOCOL
+## 7. VERIFICATION DELTA
 
-1. **Fresh-load asset dump**: in a new exec block, `AssetDatabase.LoadAssetAtPath` the
-   `.playable` at `<assetPath>` and dump every track/clip (name, start/duration,
-   `timeScale`, `stat` and its `key`, caps). In-memory state after a save is not evidence.
-2. **Raw YAML check**: authored-mode clips must show `stat: {fileID: 0}`; stat-driven
-   clips a guid asset reference; confirm `m_Duration` values and the inherited
-   `resetOnDeactivate` on the track.
-3. **Survival proof from a RELOADED SubScene**: binding table must show
-   `<trackName>(TimelineTimeScaleTrack) -> <bindTarget>(StatAuthoring)`, and the bind
-   target's StatDefaults must contain the entry recipe 4.1 added — a WHOLE number in
-   ×100 fixed-point (e.g. 25 for a 0.25 factor; a fractional value is the silent
-   freeze trap, §2).
-4. **Parent-scene restore**: end with `sceneCount=1`,
-   `scene[0]=<parentScenePath>|loaded=True|active=True|dirty=False`.
-5. **Console**: `unity-cli console --filter error` must show nothing new beyond the
-   project's known pre-existing background entries (vex-ee baseline listed in §5).
+Run the unity-timeline-track-authoring §4 protocol. Track-specific expectations for its steps:
+- **Asset dump (step 1):** dump per clip `timeScale`, `stat` and its `key`, caps.
+- **Raw YAML (step 2):** authored-mode clips show `stat: {fileID: 0}`; stat-driven clips a guid asset
+  ref; confirm `m_Duration` and the inherited `resetOnDeactivate` on the track.
+- **Prerequisite re-check (step 3):** the bound StatAuthoring's StatDefaults must contain recipe
+  4.1's entry as a WHOLE number in ×100 fixed-point (e.g. 25 for a 0.25 factor; a fractional value is
+  the silent freeze trap, §2).
+- **Binding (step 4):** `<trackName>(TimelineTimeScaleTrack) -> <bindTarget>(StatAuthoring)`.
