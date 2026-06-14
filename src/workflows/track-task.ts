@@ -5,8 +5,10 @@ import { execFileSync } from 'node:child_process';
 // every src/agents/*.ts as an addressable agent and requires it to
 // default-export createAgent(...); the registry is a Record consumed via init().
 import trackExperts, { buildBoss, expertFor, DEFAULT_MODEL } from '../track-experts';
+import { resolvePlan } from '../keys';
 import trackTask from '../skills/track-task/SKILL.md' with { type: 'skill' };
 import trackUndo from '../skills/track-undo/SKILL.md' with { type: 'skill' };
+import { vexTools } from '../tools/vex';
 
 // Track specialist workflow v2: route a designer's request to the trained
 // mastery expert for one DOTS Timeline track family and return a MEMORY CARD
@@ -67,7 +69,12 @@ export async function run({ init, payload, id }: FlueContext) {
 	// supports). With an override we rebuild the expert on that model; without
 	// one we use the prebuilt registry (default model). The Editor/unity-cli
 	// side passes this, so callers pick the model without touching flue.
-	const model = String((payload as any).model ?? '').trim();
+	// Resolve a key ALIAS ('glm', 'glm:glm-5.2', 'fast') to a concrete provider/model via the key router (honors the
+	// peak guard + primary-key choice); a concrete 'provider/model' passes straight through. NOTE: track-task uses the
+	// resolved model for the whole expert run — per-call cross-key FALLBACK + usage accounting (as in chat.ts) is a
+	// follow-up; the in-window chat path has the full key system today.
+	const rawModel = String((payload as any).model ?? '').trim();
+	const model = rawModel ? (resolvePlan(rawModel)[0]?.model ?? rawModel) : '';
 	const expert = model
 		? expertFor(track, model, skillNames)
 		: track === '__boss__' && skillNames.length
@@ -86,6 +93,7 @@ export async function run({ init, payload, id }: FlueContext) {
 	let { data } = await session.skill(trackTask, {
 		args: { request, context },
 		result: resultSchema,
+		tools: vexTools,
 	});
 
 	// Unlike spawn-agent, we run the code RAW — no subSceneBracket wrap. The
@@ -129,6 +137,7 @@ export async function run({ init, payload, id }: FlueContext) {
 			const repair = await session.skill(trackTask, {
 				args: { request, context, previousCode: data.code, compileErrors: result },
 				result: resultSchema,
+				tools: vexTools,
 			});
 			data = repair.data;
 			repairRounds++;

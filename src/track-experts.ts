@@ -6,6 +6,7 @@ import playerInput from './skills/unity-player-input/SKILL.md' with { type: 'ski
 import trackTask from './skills/track-task/SKILL.md' with { type: 'skill' };
 import trackUndo from './skills/track-undo/SKILL.md' with { type: 'skill' };
 import chat from './skills/chat/SKILL.md' with { type: 'skill' };
+import judge from './skills/judge/SKILL.md' with { type: 'skill' };
 import stageFoundations from './skills/unity-stage-foundations/SKILL.md' with { type: 'skill' };
 import augmentArchitecture from './skills/unity-augment-architecture/SKILL.md' with { type: 'skill' };
 import distanceToStat from './skills/unity-track-distance-to-stat/SKILL.md' with { type: 'skill' };
@@ -265,6 +266,33 @@ function buildD1(model: string = DEFAULT_MODEL) {
 
 trackExperts['__d1__'] = buildD1();
 
+// --- The Judge (forge pipeline) ---------------------------------------------
+// A deliberately MINIMAL, BLIND, hostile independent reviewer used by the forge
+// coder→judge→refine loop. It carries only THREE skills (unity-cli + protocol +
+// the judge contract) — no mastery skills, so it cannot be primed by the coder's
+// domain framing and stays cheap. It is given vex_call/vex_schemas + the ability
+// to AUTHOR exec read-backs so it can INDEPENDENTLY re-verify the coder's work
+// rather than trust the submitted artifacts. Fresh session each round keeps each
+// verdict context-isolated. The judge skill enforces default-FAIL.
+export function buildJudge(model: string = DEFAULT_MODEL) {
+	return createAgent(() => ({
+		model,
+		skills: [unityCli, agentProtocol, judge],
+		instructions:
+			'You are a HOSTILE, INDEPENDENT code reviewer in a coder→judge loop. A separate ' +
+			'coder agent claims it built and verified a Unity change; you do NOT see its reasoning ' +
+			'— only the request, the submitted C#, the raw exec evidence, and the undo journal. ' +
+			'NEVER trust the coder: its prose is withheld by design and a clean-looking submission ' +
+			'proves nothing. Your default verdict is FAIL. You have vex_call / vex_schemas and you ' +
+			'AUTHOR your OWN C# read-backs to INDEPENDENTLY verify the claim in the live Editor ' +
+			'(same exec-sandbox rules as the builder: fully-qualified types, no `using`, no type ' +
+			'defs, while-loops, end with a `return`; print one `CHECK|<name>|pass|<detail>` line per ' +
+			'check). Pass ONLY when your own independent evidence proves every implied requirement ' +
+			'AND there are zero blocking issues AND the exec actually succeeded. Apply the judge ' +
+			'skill and return exactly the structured result it defines.',
+	}));
+}
+
 // Resolve the expert for a request, honoring an optional per-request model
 // override (any provider/model the runtime supports). With no override the
 // caller should use the prebuilt registry; this rebuilds the expert on the
@@ -315,9 +343,12 @@ export function buildChatAgent(model: string = DEFAULT_MODEL, extraSkillNames: s
 		skills: [...new Set([unityCli, agentProtocol, stageFoundations, augmentArchitecture, chat, ...extras])],
 		instructions:
 			'You are Vex, a helpful Unity assistant chatting with a developer inside the Unity Editor. ' +
-			'Answer their questions and requests conversationally and concisely. You can author and run C# via ' +
-			'unity-cli when they ask you to inspect or change the project, following the unity-agent-protocol ' +
-			'(discover before assuming; never claim what you did not verify). You also carry two knowledge skills for ' +
+			'Answer their questions and requests conversationally and concisely. When they ask you to inspect or ' +
+			'change the project, you AUTHOR C# (returned in the `code` field) that the runtime runs in their LIVE ' +
+			'Editor via unity-cli — you never invoke unity-cli or a shell yourself, and you must NEVER refuse or give ' +
+			'up because Unity / a project / unity-cli looks absent from your own sandbox: that is expected and ' +
+			'irrelevant, the live Editor has everything. Follow the unity-agent-protocol (discover before assuming; ' +
+			'never claim what you did not verify). You also carry two knowledge skills for ' +
 			'THIS project — activate them when relevant: unity-stage-foundations (the DOTS Timeline stage lives inside ' +
 			'a SubScene, so to count/inspect directors, actors, targets or physics bodies you must query the SubScene ' +
 			'entities, not just the open scene) and unity-augment-architecture (how Input→Event→Reaction→Action→' +

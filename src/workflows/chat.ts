@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { buildChatAgent } from '../track-experts';
 import { resolvePlan, withKeyFallback, recordUsage, DEFAULT_MODEL } from '../keys';
 import chat from '../skills/chat/SKILL.md' with { type: 'skill' };
+import { vexTools } from '../tools/vex';
 
 // In-Editor chat workflow: the conversational counterpart to track-task. The chat agent answers directly and,
 // when a Unity change/inspection is needed, AUTHORS C# in `code` (it has no terminal). This workflow runs that
@@ -69,7 +70,7 @@ export async function run({ init, payload, id }: FlueContext) {
 	try {
 		const { value, step } = await withKeyFallback(
 			plan,
-			async (m) => await session.skill(chat, { args: { request, context }, result: schema, model: m }),
+			async (m) => await session.skill(chat, { args: { request, context }, result: schema, model: m, tools: vexTools }),
 			(failed, next, err) => process.stderr.write(`[flue] key ${failed.key} (${failed.model}) failed: ${(err as any)?.message || String(err)}${next ? `; trying ${next.key}` : ''}\n`),
 		);
 		data0 = value.data;
@@ -100,6 +101,7 @@ export async function run({ init, payload, id }: FlueContext) {
 				},
 				result: schema,
 				model: usedModel || DEFAULT_MODEL,
+				tools: vexTools,
 			});
 			recordUsage(usedKey || 'minimax', (repair as any).usage);
 			const fixed = stripUsings(repair.data.code ?? '');

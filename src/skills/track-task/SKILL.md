@@ -47,6 +47,11 @@ resolve types via reflection) and bail out with an honest `return` message if
 a needed thing does not exist. Never hardcode a remembered name as if it were
 verified here.
 
+Tool-first: before authoring the C# block, call `vex_schemas` to list the
+deterministic vex tools; if one fits the request, use `vex_call` ({tool,params})
+and read `data.verify.pass` / the error code instead — author C# only as the
+FALLBACK when no tool covers the work.
+
 The C# block must:
 
 - Use **fully-qualified type names** (`UnityEngine.GameObject`,
@@ -192,6 +197,21 @@ nothing was mutated. Read every compiler error, fix the cause in
 flagged lines), and return the full corrected block in the same
 `{code, explanation}` shape. Do not change what the code is trying to do —
 only make it compile and stay honest.
+
+**Judge feedback rounds:** if the arguments include `judgeFeedback` (and a
+`previousCode`), your previous block **compiled and RAN** — this is NOT a
+compile error — but a FRESH, independent judge agent REJECTED the result after
+re-verifying it itself. `judgeFeedback` lists its concrete blocking issues. Fix
+**each blocking issue at its CAUSE** (e.g. the object landed in the open scene
+instead of the SubScene, the wrong director was bound, a value was off, the
+change was not reversible) — do not merely re-run the same code. Then add a
+**fresh-load read-back** to the END of `code` that re-opens/queries the state
+from scratch and PROVES each formerly-blocking issue is now resolved, printing
+the proof in the returned `RESULT|`/`CHECK|` lines so the judge can confirm it
+on raw evidence. **Do not argue in prose or in `explanation`** that the judge
+was wrong — the judge ignores your reasoning and trusts only fresh evidence;
+make the code produce that evidence. Keep `PRE|` captures honest so the undo
+journal stays correct.
 
 After your code is executed you will be asked a follow-up (the `track-undo`
 skill) to derive the undo journal from the ACTUAL printed `PRE|` values —
