@@ -38,6 +38,12 @@ export async function run({ init, payload, id }: FlueContext) {
 	const context = String((payload as any).context ?? '');
 	const requestedModel = String((payload as any).model ?? '').trim();
 
+	// Skills the user ALLOWED in the Editor's Manage Skills window (Vex bridge → payload.skills). buildChatAgent
+	// resolves the ones flue ships and ignores the rest, so opting a skill in there makes the chat agent carry it.
+	const allowedSkills = Array.isArray((payload as any).skills)
+		? (payload as any).skills.map((s: unknown) => String(s)).filter(Boolean)
+		: [];
+
 	const rawSession = String((payload as any).session ?? '').trim();
 	const sessionName = rawSession && !rawSession.startsWith('task:')
 		? rawSession
@@ -46,7 +52,7 @@ export async function run({ init, payload, id }: FlueContext) {
 	const schema = v.object({ answer: v.string(), code: v.string() });
 
 	// One harness for the whole turn; the model is overridden per call so the fallback chain needs no rebuild.
-	const harness = await init(buildChatAgent(DEFAULT_MODEL));
+	const harness = await init(buildChatAgent(DEFAULT_MODEL, allowedSkills));
 	const session = await harness.session(sessionName);
 	const plan = resolvePlan(requestedModel);
 

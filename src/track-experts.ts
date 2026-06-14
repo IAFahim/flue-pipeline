@@ -36,6 +36,19 @@ import trackUi from './skills/unity-track-ui/SKILL.md' with { type: 'skill' };
 import trackGridInfluence from './skills/unity-track-grid-influence/SKILL.md' with { type: 'skill' };
 import trackParenting from './skills/unity-track-parenting/SKILL.md' with { type: 'skill' };
 import trackStatefulTrigger from './skills/unity-track-stateful-trigger/SKILL.md' with { type: 'skill' };
+// Knowledge skills (no track of their own) — importable so the chat agent can carry any the user ALLOWS in the
+// Editor's Manage Skills window. Skill bodies load only on activation, so listing them costs ~nothing until used.
+import combos from './skills/unity-combos/SKILL.md' with { type: 'skill' };
+import designerVocabulary from './skills/unity-designer-vocabulary/SKILL.md' with { type: 'skill' };
+import essenceActions from './skills/unity-essence-actions/SKILL.md' with { type: 'skill' };
+import gameplayConfig from './skills/unity-gameplay-config/SKILL.md' with { type: 'skill' };
+import mechanicCookbook from './skills/unity-mechanic-cookbook/SKILL.md' with { type: 'skill' };
+import mechanicDiagrams from './skills/unity-mechanic-diagrams/SKILL.md' with { type: 'skill' };
+import objectDefinitions from './skills/unity-object-definitions/SKILL.md' with { type: 'skill' };
+import reactions from './skills/unity-reactions/SKILL.md' with { type: 'skill' };
+import statsIntrinsics from './skills/unity-stats-intrinsics/SKILL.md' with { type: 'skill' };
+import targets from './skills/unity-targets/SKILL.md' with { type: 'skill' };
+import traPayloads from './skills/unity-tra-payloads/SKILL.md' with { type: 'skill' };
 
 // The default model every expert runs on. Any request may override it (the
 // track-task workflow threads `payload.model` through to expertFor), so the
@@ -259,7 +272,37 @@ trackExperts['__d1__'] = buildD1();
 // A general conversational agent for the in-Editor chat surface (the Unity Assistant window on the vex flue
 // backend). Unlike the track specialists, it ANSWERS questions directly and only authors C# (via unity-cli) when
 // asked — it never "gives up" on a plain question. Carries the operating + behavioural skills plus the chat skill.
-export function buildChatAgent(model: string = DEFAULT_MODEL) {
+// Every skill resolvable by its Manage-Skills name (== SKILL.md `name` == folder). The Editor passes the user's
+// ALLOWED skill names; buildChatAgent resolves them through this map (unknown names — Unity-native skills, etc. —
+// are silently ignored). Spreads in all the per-track masteries on top of the operating + knowledge skills.
+export const skillByName: Record<string, Skill> = {
+	'unity-cli': unityCli,
+	'unity-agent-protocol': agentProtocol,
+	'unity-player-input': playerInput,
+	'unity-timeline-track-authoring': timelineTrackAuthoring,
+	'unity-stage-foundations': stageFoundations,
+	'unity-augment-architecture': augmentArchitecture,
+	'unity-combos': combos,
+	'unity-designer-vocabulary': designerVocabulary,
+	'unity-essence-actions': essenceActions,
+	'unity-gameplay-config': gameplayConfig,
+	'unity-mechanic-cookbook': mechanicCookbook,
+	'unity-mechanic-diagrams': mechanicDiagrams,
+	'unity-object-definitions': objectDefinitions,
+	'unity-reactions': reactions,
+	'unity-stats-intrinsics': statsIntrinsics,
+	'unity-targets': targets,
+	'unity-tra-payloads': traPayloads,
+	...masteryByName,
+};
+
+// `extraSkillNames` are the skills the user ALLOWED in the Editor's Manage Skills window (threaded through as
+// payload.skills). They are added — deduped — on top of the always-on base, so opting a skill in there makes the
+// chat agent actually carry it. Unknown names are ignored.
+export function buildChatAgent(model: string = DEFAULT_MODEL, extraSkillNames: string[] = []) {
+	const extras = [...new Set(extraSkillNames)]
+		.map((n) => skillByName[n])
+		.filter((s): s is Skill => Boolean(s));
 	return createAgent(() => ({
 		model,
 		// Beyond the operating + chat skills, the chat agent carries two KNOWLEDGE skills so it is actually competent
@@ -267,8 +310,9 @@ export function buildChatAgent(model: string = DEFAULT_MODEL) {
 		// director/actor/target/physics-body live inside a SubScene, and how to query them, which is exactly why naive
 		// answers like "how many directors → 0" happen without it) and unity-augment-architecture (the whole-mechanic
 		// composition model: Input→Event→Reaction→Action→ObjectDefinition→TRA→EntityLink→Essence). Skill bodies load
-		// only on activation, so they cost ~nothing until a question needs them.
-		skills: [unityCli, agentProtocol, stageFoundations, augmentArchitecture, chat],
+		// only on activation, so they cost ~nothing until a question needs them. Any user-allowed skills (extras) are
+		// appended; the Set below dedupes against the base by object identity (same imported Skill reference).
+		skills: [...new Set([unityCli, agentProtocol, stageFoundations, augmentArchitecture, chat, ...extras])],
 		instructions:
 			'You are Vex, a helpful Unity assistant chatting with a developer inside the Unity Editor. ' +
 			'Answer their questions and requests conversationally and concisely. You can author and run C# via ' +
@@ -279,7 +323,9 @@ export function buildChatAgent(model: string = DEFAULT_MODEL) {
 			'entities, not just the open scene) and unity-augment-architecture (how Input→Event→Reaction→Action→' +
 			'ObjectDefinition→TRA→EntityLink→Essence compose). For DEEP single-track authoring (building/verifying a ' +
 			'specific timeline track with full undo), tell the developer it is best run via `assistant_run` with the ' +
-			'matching track specialist, then help as far as you safely can. Apply the chat skill and return exactly the ' +
+			'matching track specialist, then help as far as you safely can. You may ALSO carry additional skills the ' +
+			'developer enabled in the Editor (your full registered catalog is the source of truth — activate any whose ' +
+			'description fits the request). Apply the chat skill and return exactly the ' +
 			'structured result it defines. Never give up on a plain question.',
 	}));
 }
